@@ -1,0 +1,131 @@
+<!doctype html>
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script type="importmap">
+        {
+          "imports": {
+            "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+            "maplibre-gl": "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
+            "masonry-layout": "https://cdnjs.cloudflare.com/ajax/libs/masonry/4.2.2/masonry.pkgd.min.js",
+            "noUiSlider": "https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.mjs",
+            "photoswipe": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe.esm.min.js",
+            "photoswipe-lightbox": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe-lightbox.esm.min.js",
+            "tabulator-tables": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator_esm.js",
+            "@turf": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/+esm",
+            "@popperjs/core": "https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/esm/popper.min.js",
+            "bootstrap": "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.esm.min.js",
+            "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.23.5/+esm"
+          }
+        }
+    </script>
+</head>
+<body class="container">
+<title>Team {{ team }} Photo Upload</title>
+<h1>Upload Photos for {{ team }}</h1>
+<form action="/team/{{ team_hash }}/upload" method="POST" enctype="multipart/form-data">
+  <div class="mb-3">
+    <input class="form-control" type="file" id="fileInput" name="file" required>
+  </div>
+  <div id="imagePreviewContainer" class="mb-3 text-center" style="display: none;">
+    <div style="display: inline-block; border: 2px dashed #007bff; padding: 15px; background-color: #f8f9fa;">
+      <span class="badge bg-warning text-dark">Image not uploaded yet</span>
+      <img id="imagePreview" src="" style="max-width: 500px; max-height: 500px; margin: auto; display: block;">
+      <div class="mt-3">
+        <table class="table table-bordered table-sm" style="width: auto; margin: auto;">
+          <thead>
+            <tr><th colspan="2" class="text-center">EXIF Metadata</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Capture Time</strong></td><td id="captureTime">None</td></tr>
+            <tr><td><strong>GPS Coordinates</strong></td><td id="gpsCoordinates">None</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary">Upload</button>
+</form>
+
+<h2>Uploaded Photos:</h2>
+<div class="row">
+  {% for image, capture_time, gps_coordinates in images %}
+    <div class="col-md-3 mb-3">
+      <div class="card">
+        <img src="/uploads/{{ team_hash }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <div class="card-body">
+          <h5 class="card-title">{{ image }}</h5>
+          <p class="card-text">
+            <strong>Capture Time:</strong> {{ capture_time if capture_time else 'None' }}<br>
+            <strong>GPS Coordinates:</strong> {{ gps_coordinates if gps_coordinates else 'None' }}
+          </p>
+          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ team_hash }}">Delete</button>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<script type="module">
+import ExifReader from 'exifreader';
+
+document.querySelectorAll('.delete-button').forEach(button => {
+  button.addEventListener('click', async function() {
+    const filename = this.getAttribute('data-filename');
+    const teamHash = this.getAttribute('data-hash');
+    if (confirm(`Are you sure you want to delete ${filename}?`)) {
+      try {
+        const response = await fetch(`/team/${teamHash}/delete?filename=${filename}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          this.closest('.col-md-3').remove();  // Remove the card from the UI
+        } else {
+          alert('Failed to delete the file.');
+        }
+      } catch (err) {
+        console.error('Error deleting image:', err);
+        alert('An error occurred while deleting the file.');
+      }
+    }
+  });
+});
+
+document.getElementById('fileInput').addEventListener('change', async function(event) {
+  const file = event.target.files[0];
+  if (file) {
+    // Display image preview
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('imagePreview').src = e.target.result;
+      document.getElementById('imagePreviewContainer').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+
+    // Read EXIF metadata using ExifReader
+    try {
+      const tags = await ExifReader.load(file);
+      let captureTime = 'None';
+      let gpsCoordinates = 'None';
+
+      // Check for GPS and DateTimeOriginal tags and extract their values
+      if ('DateTimeOriginal' in tags) {
+        captureTime = tags['DateTimeOriginal'].description || 'Present';
+      }
+      if ('GPSLatitude' in tags && 'GPSLongitude' in tags) {
+        const lat = tags['GPSLatitude'].description;
+        const lon = tags['GPSLongitude'].description;
+        gpsCoordinates = `Lat: ${lat}, Lon: ${lon}`;
+      }
+
+      // Update EXIF status in the UI
+      document.getElementById('captureTime').innerText = captureTime;
+      document.getElementById('gpsCoordinates').innerText = gpsCoordinates;
+    } catch (error) {
+      console.error('Error reading EXIF data:', error);
+      document.getElementById('captureTime').innerText = 'Failed to read';
+      document.getElementById('gpsCoordinates').innerText = 'Failed to read';
+    }
+  }
+});
+</script>
+</body>
