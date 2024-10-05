@@ -1,5 +1,8 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+  <title>Team {{ team }} Photo Upload</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha256-V2sIX92Uh6ZaGSFTKMHghsB85b9toJtmazgG09AI2uk=" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script type="importmap">
         {
@@ -14,59 +17,150 @@
             "@turf": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/+esm",
             "@popperjs/core": "https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/esm/popper.min.js",
             "bootstrap": "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.esm.min.js",
-            "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.23.5/+esm"
+            "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.23.5/+esm",
+            "heic-to": "https://cdn.jsdelivr.net/npm/heic-to@1.0.2/+esm"
           }
         }
     </script>
 </head>
 <body class="container">
-<title>Team {{ team }} Photo Upload</title>
-<h1>Upload Photos for {{ team }}</h1>
-<form action="/team/{{ team_hash }}/upload" method="POST" enctype="multipart/form-data">
-  <div class="mb-3">
-    <input class="form-control" type="file" id="fileInput" name="file" required>
-  </div>
-  <div id="imagePreviewContainer" class="mb-3 text-center" style="display: none;">
-    <div style="display: inline-block; border: 2px dashed #007bff; padding: 15px; background-color: #f8f9fa;">
-      <span class="badge bg-warning text-dark">Image not uploaded yet</span>
-      <img id="imagePreview" src="" style="max-width: 500px; max-height: 500px; margin: auto; display: block;">
-      <div class="mt-3">
-        <table class="table table-bordered table-sm" style="width: auto; margin: auto;">
-          <thead>
-            <tr><th colspan="2" class="text-center">EXIF Metadata</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><strong>Capture Time</strong></td><td id="captureTime">None</td></tr>
-            <tr><td><strong>GPS Coordinates</strong></td><td id="gpsCoordinates">None</td></tr>
-          </tbody>
-        </table>
+
+<div class="container mt-4 mb-4">
+<h1>{{ team }}</h1>
+
+<form action="/team/{{ team_hash }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
+  <div class="row mt-3 mb-3 align-items-center">
+    <label for="fileInput" class="col-sm-2 col-form-label">Upload Photos:</label>
+    <div class="col-sm-10">
+      <div class="input-group">
+        <input type="file" class="form-control" id="fileInput" name="files" multiple required>
+        <button type="submit" class="btn btn-primary">Upload</button>
       </div>
     </div>
   </div>
-  <button type="submit" class="btn btn-primary">Upload</button>
+  <div id="imagePreviewContainer" class="row mb-3 p-4 border border-primary text-bg-light" style="display: none"></div>
 </form>
 
-<h2>Uploaded Photos:</h2>
 <div class="row">
-  {% for image, capture_time, gps_coordinates in images %}
+  {% for image, capture_time, gps_coordinates in images | sort(attribute='capture_time') %}
     <div class="col-md-3 mb-3">
       <div class="card">
+      <div class="d-flex justify-content-center text-bg-light spinner-container p-5 d-none" >
+        <div class="spinner-border text-secondary opacity-50" role="status"><span class="visually-hidden">Loading...</span>
+          </div>
+      </div>
         <img src="/uploads/{{ team_hash }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
         <div class="card-body">
           <h5 class="card-title">{{ image }}</h5>
           <p class="card-text">
             <strong>Capture Time:</strong> {{ capture_time if capture_time else 'None' }}<br>
-            <strong>GPS Coordinates:</strong> {{ gps_coordinates if gps_coordinates else 'None' }}
+            <strong>GPS Coordinates:</strong> {% if gps_coordinates %}<a href="https://www.google.com/maps?q={{ gps_coordinates[0]|round(6) }},{{ gps_coordinates[1]|round(6) }}" target="_blank">({{ gps_coordinates[0]|round(6) }}, {{ gps_coordinates[1]|round(6) }})</a>{% else %}None{% endif %}
           </p>
           <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ team_hash }}">Delete</button>
         </div>
       </div>
     </div>
   {% endfor %}
+  {% if images | length == 0 %}
+    <div class="col">
+      <div class="alert alert-warning" role="alert">
+        No images uploaded yet.
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+  <div id="map" style="width: 100%; height: 500px;"></div>
 </div>
 
 <script type="module">
+import 'maplibre-gl';
 import ExifReader from 'exifreader';
+import {heicTo} from 'heic-to';
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Fallback setup function
+  const setupImageFallback = (imgElement) => {
+    if (!imgElement.src.toLowerCase().endsWith('.heic')) {
+      return;
+    }
+
+    const parentElement = imgElement.parentElement;
+
+    const fallbackLogic = async () => {
+      // Hide the failed image and show a spinner
+      imgElement.hidden = true;
+      const spinner = parentElement.querySelector('.spinner-container');
+      if (spinner) spinner.classList.remove('d-none');
+
+      // Proceed with conversion if the HEIC image fails to load
+      try {
+        const response = await fetch(imgElement.src);
+        const blob = await response.blob();
+        const convertedBlob = await heicTo({ blob, type: 'image/jpeg', quality: 0.5 });
+        const objectURL = URL.createObjectURL(convertedBlob);
+        imgElement.src = objectURL;
+        imgElement.hidden = false;
+      } catch (error) {
+        console.error('Error converting HEIC image:', error);
+      } finally {
+        // Remove the spinner
+        if (spinner) spinner.classList.add('d-none');
+      }
+    };
+
+    // Register the error handler early
+    imgElement.onerror = fallbackLogic;
+
+    // Check if the image is already in a failed state (e.g., on page load)
+    if (imgElement.complete && imgElement.naturalWidth === 0) {
+      fallbackLogic();
+    }
+  };
+
+  // Attach handlers to initial images in the DOM
+  document.querySelectorAll('img.card-img-top').forEach(setupImageFallback);
+
+});
+
+// Initialize your MapLibre map
+const map = new maplibregl.Map({
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    container: 'map',
+    zoom: 9.5,
+    center: [-122.3321, 47.6062] // Default center [lng, lat]
+});
+
+// Array to store images with GPS coordinates from the backend
+const imagesWithCoordinates = [
+  {% for image, capture_time, gps_coordinates in images %}
+    {% if gps_coordinates %}
+      {
+        image: '{{ image }}',
+        lat: {{ gps_coordinates[0] }},
+        lng: {{ gps_coordinates[1] }}
+      },
+    {% endif %}
+  {% endfor %}
+];
+
+// Add markers to the map for each image with GPS coordinates
+imagesWithCoordinates.forEach(({ image, lat, lng }) => {
+    // Create a DOM element for each marker
+    const el = document.createElement('div');
+    el.className = 'marker';
+    el.style.width = '20px';
+    el.style.height = '20px';
+    el.style.backgroundColor = '#007bff';
+    el.style.borderRadius = '50%';
+
+    // Add a marker to the map
+    new maplibregl.Marker(el)
+        .setLngLat([lng, lat])
+        .setPopup(new maplibregl.Popup({ offset: 25 }) // Add popups
+            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ team_hash }}/${image}" style="width: 100px; height: auto;">`))
+        .addTo(map);
+});
 
 document.querySelectorAll('.delete-button').forEach(button => {
   button.addEventListener('click', async function() {
@@ -90,15 +184,50 @@ document.querySelectorAll('.delete-button').forEach(button => {
   });
 });
 
-document.getElementById('fileInput').addEventListener('change', async function(event) {
-  const file = event.target.files[0];
-  if (file) {
-    // Display image preview
+// Handle file input change
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', async function(event) {
+  const files = Array.from(event.target.files);
+  const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+  imagePreviewContainer.innerHTML = '';
+  if (files.length > 0) {
+    imagePreviewContainer.style.display = '';
+  }
+  for (const file of files) {
     const reader = new FileReader();
+    const previewElement = document.createElement('div');
+    previewElement.classList.add('col-md-3', 'mb-3');
+    previewElement.innerHTML = `
+      <div class="card">
+        <img src="" class="card-img-top" style="max-width: 100%; max-height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <div class="card-body">
+          <h5 class="card-title">${file.name}</h5>
+          <p class="card-text">
+            <strong>Capture Time:</strong> <span class="captureTime">None</span><br>
+            <strong>GPS Coordinates:</strong> <span class="gpsCoordinates">None</span>
+          </p>
+          <span class="badge bg-warning text-dark">Image not uploaded yet</span>
+        </div>
+      </div>
+    `;
+    imagePreviewContainer.appendChild(previewElement);
+
     reader.onload = function(e) {
-      document.getElementById('imagePreview').src = e.target.result;
-      document.getElementById('imagePreviewContainer').style.display = 'block';
-    };
+      let previewImgElement = previewElement.querySelector('img');
+      previewImgElement.onerror = async function() {
+          let convertedFile = file;
+          if (file.type === 'image/heic') {
+            try {
+              convertedFile = await heicTo({ blob: file, toType: 'image/jpeg', quality: 0.5});
+            } catch (error) {
+              console.error('Error converting HEIC image:', error);
+              return;
+            }
+            previewImgElement.src = URL.createObjectURL(convertedFile);
+          }
+      }
+      previewImgElement.src = e.target.result;
+    }
     reader.readAsDataURL(file);
 
     // Read EXIF metadata using ExifReader
@@ -112,20 +241,21 @@ document.getElementById('fileInput').addEventListener('change', async function(e
         captureTime = tags['DateTimeOriginal'].description || 'Present';
       }
       if ('GPSLatitude' in tags && 'GPSLongitude' in tags) {
-        const lat = tags['GPSLatitude'].description;
-        const lon = tags['GPSLongitude'].description;
-        gpsCoordinates = `Lat: ${lat}, Lon: ${lon}`;
+        const lat = parseFloat(tags['GPSLatitude'].description).toFixed(6);
+        const lon = parseFloat(tags['GPSLongitude'].description).toFixed(6);
+        gpsCoordinates = `<a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">(${lat}, ${lon})</a>`;
       }
 
       // Update EXIF status in the UI
-      document.getElementById('captureTime').innerText = captureTime;
-      document.getElementById('gpsCoordinates').innerText = gpsCoordinates;
+      previewElement.querySelector('.captureTime').innerText = captureTime;
+      previewElement.querySelector('.gpsCoordinates').innerHTML = gpsCoordinates;
     } catch (error) {
       console.error('Error reading EXIF data:', error);
-      document.getElementById('captureTime').innerText = 'Failed to read';
-      document.getElementById('gpsCoordinates').innerText = 'Failed to read';
+      previewElement.querySelector('.captureTime').innerText = 'Failed to read';
+      previewElement.querySelector('.gpsCoordinates').innerText = 'Failed to read';
     }
   }
 });
 </script>
 </body>
+</html>

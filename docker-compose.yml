@@ -1,8 +1,16 @@
 version: '3'
 services:
-  relay-photo-portal:
+  relay-photo-collector:
+    env_file:
+      - .env
+    container_name: relay-photo-collector
     build: .
-    ports:
-      - "5000:5000"
     volumes:
       - "./uploads:/app/uploads"
+    expose:
+      - "5001"
+    networks:
+      - web_network
+networks:
+  web_network:
+    external: true
