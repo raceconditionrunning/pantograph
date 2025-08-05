@@ -1,0 +1,17 @@
+# Auto-applied development overrides
+# This file is automatically used by `docker compose up`
+# Disable with: docker compose -f docker-compose.yml up
+services:
+  relay-photo-collector:
+    volumes:
+      - "./app.py:/app/app.py"
+      - "./models.py:/app/models.py"
+      - "./templates:/app/templates"
+      - "./scripts:/app/scripts"
+      - "./requirements.txt:/app/requirements.txt"
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    command: ["python", "app.py"]

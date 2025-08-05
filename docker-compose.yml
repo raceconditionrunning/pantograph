@@ -6,6 +6,7 @@ services:
     build: .
     volumes:
       - "./uploads:/app/uploads"
+      - "./data:/app/data"
     expose:
       - "5001"
     networks:
