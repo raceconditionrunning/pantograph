@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+</head>
+<body>
+
+
+<div class="container mt-4">
+{% include '_navbar.html' %}
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <ion-icon name="people" class="me-2"></ion-icon>
+                        Create New Team
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="alert-container"></div>
+
+                    <form id="create-team-form">
+                        <div class="mb-3">
+                            <label for="format" class="form-label">
+                                <ion-icon name="options" class="me-1"></ion-icon>
+                                Format <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="format" name="format" required>
+                                <option value="">Select format...</option>
+                                <option value="Solo">Solo</option>
+                                <option value="Team">Team</option>
+                            </select>
+                            <div class="form-text">Choose whether this is a solo or team effort</div>
+                        </div>
+
+                        <div class="mb-3" id="team-name-section">
+                            <label for="team_name" class="form-label">
+                                <ion-icon name="flag" class="me-1"></ion-icon>
+                                Team Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="team_name" name="team_name" required maxlength="255">
+                            <div class="form-text" id="team-name-help">Choose a unique name for your team</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="estimated_duration" class="form-label">
+                                <ion-icon name="time" class="me-1"></ion-icon>
+                                Estimated Duration <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="estimated_duration" name="estimated_duration"
+                                   placeholder="1:30" pattern="^\d{1,2}:\d{2}$" required>
+                            <div class="form-text">Format: HH:MM (e.g., 1:30 for 1 hour 30 minutes)</div>
+                        </div>
+
+                        <div class="mb-3" id="password-section" style="display: none;">
+                            <label for="password" class="form-label">
+                                <ion-icon name="lock-closed" class="me-1"></ion-icon>
+                                Team Password
+                            </label>
+                            <input type="password" class="form-control" id="password" name="password" maxlength="255">
+                            <div class="form-text">Optional: Set a password to require for joining this team</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="comments" class="form-label">
+                                <ion-icon name="chatbubble" class="me-1"></ion-icon>
+                                Comments
+                            </label>
+                            <textarea class="form-control" id="comments" name="comments" rows="3"
+                                      placeholder="Any additional information about your team..."></textarea>
+                            <div class="form-text">Optional: Add any relevant details or strategy notes</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin') }}" class="btn btn-secondary me-md-2">
+                                <ion-icon name="arrow-back" class="me-1"></ion-icon>
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submit-btn">
+                                <ion-icon name="add-circle" class="me-1"></ion-icon>
+                                Create Team
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle format selection changes
+document.getElementById('format').addEventListener('change', function(e) {
+    const formatValue = e.target.value;
+    const teamNameInput = document.getElementById('team_name');
+    const teamNameLabel = document.querySelector('label[for="team_name"]').childNodes[2]; // The text node
+    const teamNameHelp = document.getElementById('team-name-help');
+    const passwordSection = document.getElementById('password-section');
+
+    if (formatValue === 'Solo') {
+        // Set team name to user's name and make it readonly
+        teamNameInput.value = '{{ user.name }}';
+        teamNameInput.readOnly = true;
+        teamNameInput.classList.add('bg-light');
+        teamNameLabel.textContent = 'Name ';
+        teamNameHelp.textContent = 'For solo entries, your name will be used automatically';
+        // Hide password section for solo teams
+        passwordSection.style.display = 'none';
+        document.getElementById('password').value = '';
+    } else if (formatValue === 'Team') {
+        // Enable team name input
+        teamNameInput.value = '';
+        teamNameInput.readOnly = false;
+        teamNameInput.classList.remove('bg-light');
+        teamNameLabel.textContent = 'Team Name ';
+        teamNameHelp.textContent = 'Choose a unique name for your team';
+        // Show password section for team format
+        passwordSection.style.display = 'block';
+    } else {
+        // Reset when no format selected
+        teamNameInput.value = '';
+        teamNameInput.readOnly = false;
+        teamNameInput.classList.remove('bg-light');
+        teamNameLabel.textContent = 'Team Name ';
+        teamNameHelp.textContent = 'Choose a unique name for your team';
+        // Hide password section when no format selected
+        passwordSection.style.display = 'none';
+        document.getElementById('password').value = '';
+    }
+});
+
+document.getElementById('create-team-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('submit-btn');
+    const alertContainer = document.getElementById('alert-container');
+
+    // Disable submit button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+
+    // Clear previous alerts
+    alertContainer.innerHTML = '';
+
+    try {
+        const formData = new FormData(this);
+        const response = await fetch('{{ url_for("create_team") }}', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // Show success message
+            alertContainer.innerHTML = `
+                <div class="alert alert-success" role="alert">
+                    <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
+                    ${result.message}
+                </div>
+            `;
+
+            // Redirect after a short delay
+            setTimeout(() => {
+                window.location.href = result.redirect_url || '{{ url_for("join_team") }}';
+            }, 2000);
+
+        } else {
+            // Show error message
+            alertContainer.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <ion-icon name="warning" class="me-2"></ion-icon>
+                    ${result.error || 'Failed to create team'}
+                </div>
+            `;
+        }
+    } catch (error) {
+        alertContainer.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <ion-icon name="warning" class="me-2"></ion-icon>
+                Network error. Please try again.
+            </div>
+        `;
+    } finally {
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<ion-icon name="add-circle" class="me-1"></ion-icon>Create Team';
+    }
+});
+
+// Format duration input as user types
+document.getElementById('estimated_duration').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/[^\d]/g, ''); // Remove non-digits
+    if (value.length >= 3) {
+        value = value.substring(0, value.length - 2) + ':' + value.substring(value.length - 2);
+    }
+    e.target.value = value;
+});
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" integrity="sha512-X/YkDZyjTf4wyc2Vy16YGCPHwAY8rZJY+POgokZjQB2mhIRFJCckEGc6YyX9eNsPfn0PzThEuNs+uaomE5CO6A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+    <title>Admin - Relay Photo Collector</title>
+</head>
+<body>
+
+<div class="container mt-4 mb-4">
+    {% include '_navbar.html' %}
+
+    <h1>Team Management</h1>
+    <p class="text-muted">Manage teams and view upload statistics</p>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Teams Overview</h5>
+                </div>
+                <div class="card-body">
+                    {% if teams %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Team Name</th>
+                                    <th>Status</th>
+                                    <th>Members</th>
+                                    <th>Photos</th>
+                                    <th>Team URL</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for team in teams %}
+                                <tr>
+                                    <td><strong>{{ team.name }}</strong></td>
+                                    <td>
+                                        {% if team.status == 'pending' %}
+                                        <span class="badge bg-warning">
+                                            <ion-icon name="time-outline" class="me-1"></ion-icon>Pending
+                                        </span>
+                                        {% elif team.status == 'complete' %}
+                                        <span class="badge bg-success">
+                                            <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>Complete
+                                        </span>
+                                        {% elif team.status == 'withdrawn' %}
+                                        <span class="badge bg-secondary">
+                                            <ion-icon name="close-circle-outline" class="me-1"></ion-icon>Withdrawn
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ team.member_count }}
+                                    </td>
+                                    <td>
+                                        {{ team.image_count }}
+                                    </td>
+                                    <td>
+                                        <code>/team/{{ team.short_id }}</code>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ team.url }}" class="btn btn-sm btn-primary" target="_blank">
+                                                <ion-icon name="images-outline"></ion-icon> Gallery
+                                            </a>
+                                            <a href="{{ url_for('team_members', short_id=team.short_id) }}" class="btn btn-sm btn-info" target="_blank">
+                                                <ion-icon name="people-outline"></ion-icon> Members
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ request.url_root }}team/{{ team.short_id }}')">
+                                                <ion-icon name="copy-outline"></ion-icon> Copy URL
+                                            </button>
+                                            {% if team.status == 'pending' %}
+                                            <button class="btn btn-sm btn-success" onclick="approveTeam('{{ team.name }}', '{{ team.short_id }}')">
+                                                <ion-icon name="checkmark-outline"></ion-icon> Approve
+                                            </button>
+                                            {% endif %}
+                                            {% if team.status != 'withdrawn' %}
+                                            <button class="btn btn-sm btn-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.short_id }}')">
+                                                <ion-icon name="close-outline"></ion-icon> Withdraw
+                                            </button>
+                                            {% endif %}
+                                            <button class="btn btn-sm btn-danger" onclick="confirmDeleteTeam('{{ team.name }}', '{{ team.short_id }}')">
+                                                <ion-icon name="trash-outline"></ion-icon> Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info" role="alert">
+                        No teams yet.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-6">Total Teams:</dt>
+                        <dd class="col-sm-6">{{ teams|length }}</dd>
+                        <dt class="col-sm-6">Total Photos:</dt>
+                        <dd class="col-sm-6">{{ teams|sum(attribute='image_count') }}</dd>
+                        <dt class="col-sm-6">Active Teams:</dt>
+                        <dd class="col-sm-6">{{ teams|selectattr('image_count', '>', 0)|list|length }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Team Status Workflow:</strong></p>
+                    <ul>
+                        <li><span class="badge bg-warning">Pending</span>: New teams await admin approval</li>
+                        <li><span class="badge bg-success">Complete</span>: Approved teams open for joining</li>
+                        <li><span class="badge bg-secondary">Withdrawn</span>: Teams withdrawn from event</li>
+                    </ul>
+                    <p><strong>Admin Actions:</strong></p>
+                    <ul>
+                        <li><strong>Approve</strong>: Change pending teams to complete status</li>
+                        <li><strong>Withdraw</strong>: Mark teams as withdrawn</li>
+                        <li><strong>Delete</strong>: Permanently remove team and data</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Team Confirmation Modal -->
+<div class="modal fade" id="deleteTeamModal" tabindex="-1" aria-labelledby="deleteTeamModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteTeamModalLabel">
+                    <ion-icon name="warning-outline" class="text-danger me-2"></ion-icon>
+                    Delete Team
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>⚠ Warning: This action cannot be undone!</strong>
+                </div>
+                <p>You are about to permanently delete the team <strong id="deleteTeamName"></strong>.</p>
+                <p>This will:</p>
+                <ul>
+                    <li>Remove all team members and their preferences</li>
+                    <li>Delete all uploaded photos</li>
+                    <li>Remove the team from the database</li>
+                    <li>Delete the team folder and all contents</li>
+                </ul>
+                <p>Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                    Delete Team
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // Create a toast notification
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-bg-success border-0 position-fixed';
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 1055;';
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">URL copied to clipboard!</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        // Show and auto-hide the toast
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    });
+}
+
+let currentShortId = null;
+
+function confirmDeleteTeam(teamName, shortId) {
+    currentShortId = shortId;
+    document.getElementById('deleteTeamName').textContent = teamName;
+
+    // Enable delete button after 3 seconds
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+
+    setTimeout(() => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete Team';
+    }, 3000);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteTeamModal'));
+    modal.show();
+
+    // Add click handler for delete button
+    deleteBtn.onclick = function() {
+        deleteTeam(currentShortId);
+    };
+}
+
+function deleteTeam(shortId) {
+    const deleteBtn = document.getElementById('confirmDeleteBtn');
+
+    // Show loading state
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+
+    fetch(`{{ url_for('delete_team', short_id='') }}${shortId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success toast
+            showToast(data.message, 'success');
+
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteTeamModal'));
+            modal.hide();
+
+            // Reload page after short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            // Show error toast
+            showToast(data.error || 'Failed to delete team', 'danger');
+
+            // Reset button
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = 'Delete Team';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('An error occurred while deleting the team', 'danger');
+
+        // Reset button
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete Team';
+    });
+}
+
+function approveTeam(teamName, shortId) {
+    if (!confirm(`Are you sure you want to approve team "${teamName}"?`)) {
+        return;
+    }
+
+    fetch(`{{ url_for('approve_team', short_id='') }}${shortId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Reload page after short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(data.error || 'Failed to approve team', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('An error occurred while approving the team', 'danger');
+    });
+}
+
+function withdrawTeam(teamName, shortId) {
+    if (!confirm(`Are you sure you want to withdraw team "${teamName}"?`)) {
+        return;
+    }
+
+    fetch(`{{ url_for('withdraw_team', short_id='') }}${shortId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Reload page after short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(data.error || 'Failed to withdraw team', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('An error occurred while withdrawing the team', 'danger');
+    });
+}
+
+function showToast(message, type = 'success') {
+    const bgClass = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center ${bgClass} border-0 position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 1060;';
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+
+    // Show and auto-hide the toast
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    setTimeout(() => {
+        toast.remove();
+    }, 4000);
+}
+</script>
+
+</body>
+</html>

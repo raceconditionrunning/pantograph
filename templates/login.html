@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+    <title>Login - Relay Photo Collector</title>
+</head>
+<body>
+
+<div class="container">
+    {% include '_navbar.html' %}
+
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm mt-5">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <h1 class="h3 mb-3 fw-normal">Sign In</h1>
+                        <p class="text-muted">Relay Photo Collector</p>
+                    </div>
+
+                    {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <ion-icon name="warning" class="me-2"></ion-icon>{{ error }}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-3">
+                        {% for provider in providers %}
+                        <a href="{{ url_for('oauth_login', provider=provider.name) }}" class="btn btn-primary btn-lg">
+                            <ion-icon name="logo-{{ provider.name }}" class="me-2"></ion-icon>
+                            Continue with {{ provider.display_name }}
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <small class="text-muted">
+                            <ion-icon name="shield-checkmark" class="me-1"></ion-icon>
+                            Secure OAuth authentication
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

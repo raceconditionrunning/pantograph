@@ -1,0 +1,84 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+<script>
+// Bootstrap theme switching based on system preference. Has to run early or we get a flash of light theme.
+(() => {
+    'use strict'
+
+    const getPreferredTheme = () => {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    const setTheme = theme => {
+        document.documentElement.setAttribute('data-bs-theme', theme)
+    }
+
+    // Set initial theme
+    setTheme(getPreferredTheme())
+
+    // Listen for changes in color scheme preference
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        setTheme(getPreferredTheme())
+    })
+})();
+</script>
+
+<script type="importmap">
+    {
+      "imports": {
+        "bootstrap": "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/js/bootstrap.esm.min.js",
+        "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+        "maplibre-gl": "https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.js",
+        "masonry-layout": "https://cdnjs.cloudflare.com/ajax/libs/masonry/4.2.2/masonry.pkgd.min.js",
+        "noUiSlider": "https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.mjs",
+        "photoswipe": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe.esm.min.js",
+        "photoswipe-lightbox": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe-lightbox.esm.min.js",
+        "tabulator-tables": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator_esm.js",
+        "@turf": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/+esm",
+        "@popperjs/core": "https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/esm/popper.min.js",
+        "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.31.1/+esm",
+        "heic-to": "https://cdn.jsdelivr.net/npm/heic-to@1.2.1/+esm"
+      }
+    }
+</script>
+
+<script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+<script type="module">
+// Global Bootstrap initialization for all pages
+import 'bootstrap';
+</script>
+
+
+<script type="module">
+// Global account deletion function
+window.confirmDeleteAccount = function() {
+    if (!confirm('Are you sure you want to delete your account? This will permanently remove all your data including team registrations. This action cannot be undone.')) {
+        return;
+    }
+
+    fetch('/delete-account', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.href = '/';
+        } else {
+            alert(data.error || 'Failed to delete account');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting your account');
+    });
+};
+</script>
+

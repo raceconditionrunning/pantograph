@@ -1,34 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Team {{ team }} Photo Upload</title>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha256-V2sIX92Uh6ZaGSFTKMHghsB85b9toJtmazgG09AI2uk=" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" integrity="sha512-b2QcS5SsA8tZodcDtGRELiGv5SaKSk1vDHDaQRda0htPYWZ6046lr3kJ5bAAQdpV2mmA/4v0wQF9MyU6/pDIAg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="importmap">
-        {
-          "imports": {
-            "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
-            "maplibre-gl": "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
-            "masonry-layout": "https://cdnjs.cloudflare.com/ajax/libs/masonry/4.2.2/masonry.pkgd.min.js",
-            "noUiSlider": "https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.mjs",
-            "photoswipe": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe.esm.min.js",
-            "photoswipe-lightbox": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe-lightbox.esm.min.js",
-            "tabulator-tables": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator_esm.js",
-            "@turf": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/+esm",
-            "@popperjs/core": "https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/esm/popper.min.js",
-            "bootstrap": "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.esm.min.js",
-            "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.23.5/+esm",
-            "heic-to": "https://cdn.jsdelivr.net/npm/heic-to@1.0.2/+esm"
-          }
-        }
-    </script>
+  {% include '_head.html' %}
+  <title>Team {{ team.name }} Photo Upload</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha256-V2sIX92Uh6ZaGSFTKMHghsB85b9toJtmazgG09AI2uk=" crossorigin="anonymous">
 </head>
-<body class="container">
+<body>
+
 
 <div class="container mt-4 mb-4">
-<h1>{{ team }}</h1>
+  {% include '_navbar.html' %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>{{ team.name }}</h1>
+</div>
 
-<form action="/team/{{ team_hash }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
+{% if team.status == 'pending' %}
+<div class="alert alert-warning" role="alert">
+  <ion-icon name="time-outline" class="me-2"></ion-icon>
+  <strong>Team Registration Pending Approval</strong><br>
+  Your team registration is awaiting admin approval. Until approved:
+  <ul class="mb-0 mt-2">
+    <li>Other users cannot join this team</li>
+    <li>The team will not appear in the public team list</li>
+  </ul>
+  <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
+</div>
+{% elif team.status == 'withdrawn' %}
+<div class="alert alert-secondary" role="alert">
+  <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
+  <strong>Team Status: Withdrawn</strong> - This team has been withdrawn from the event.
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and (current_user.is_admin or team.captain_id == current_user.id or current_user.memberships.filter_by(team_id=team.id).first()) %}
+<div class="alert alert-info" role="alert">
+  <ion-icon name="link-outline" class="me-2"></ion-icon>
+  <strong>Public View Link:</strong> Share this link for view-only access to your gallery:<br>
+  <div class="input-group mt-2">
+    <input type="text" class="form-control" id="publicLink" value="{{ request.url_root }}gallery/{{ team.gallery_hash }}" readonly>
+    <button class="btn btn-outline-secondary" type="button" onclick="copyPublicLink()">
+      <ion-icon name="copy-outline"></ion-icon> Copy
+    </button>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and team.status not in ['pending', 'withdrawn'] %}
+  {% set can_upload = false %}
+  {% if current_user.is_admin or team.captain_id == current_user.id %}
+    {% set can_upload = true %}
+  {% else %}
+    {% for membership in current_user.memberships if membership.team_id == team.id and membership.status == 'active' %}
+      {% set can_upload = true %}
+    {% endfor %}
+  {% endif %}
+
+  {% if can_upload %}
+<form action="/team/{{ short_id }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
   <div class="row mt-3 mb-3 align-items-center">
     <label for="fileInput" class="col-sm-2 col-form-label">Upload Photos:</label>
     <div class="col-sm-10">
@@ -40,6 +68,8 @@
   </div>
   <div id="imagePreviewContainer" class="row mb-3 p-4 border border-primary text-bg-light" style="display: none"></div>
 </form>
+  {% endif %}
+{% endif %}
 
 <div class="row">
   {% for image, capture_time, gps_coordinates in images | sort(attribute='capture_time') %}
@@ -49,14 +79,14 @@
         <div class="spinner-border text-secondary opacity-50" role="status"><span class="visually-hidden">Loading...</span>
           </div>
       </div>
-        <img src="/uploads/{{ team_hash }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <img src="/uploads/{{ short_id }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
         <div class="card-body">
           <h5 class="card-title">{{ image }}</h5>
           <p class="card-text">
             <strong>Capture Time:</strong> {{ capture_time if capture_time else 'None' }}<br>
             <strong>GPS Coordinates:</strong> {% if gps_coordinates %}<a href="https://www.google.com/maps?q={{ gps_coordinates[0]|round(6) }},{{ gps_coordinates[1]|round(6) }}" target="_blank">({{ gps_coordinates[0]|round(6) }}, {{ gps_coordinates[1]|round(6) }})</a>{% else %}None{% endif %}
           </p>
-          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ team_hash }}">Delete</button>
+          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ short_id }}">Delete</button>
         </div>
       </div>
     </div>
@@ -158,7 +188,7 @@ imagesWithCoordinates.forEach(({ image, lat, lng }) => {
     new maplibregl.Marker(el)
         .setLngLat([lng, lat])
         .setPopup(new maplibregl.Popup({ offset: 25 }) // Add popups
-            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ team_hash }}/${image}" style="width: 100px; height: auto;">`))
+            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ short_id }}/${image}" style="width: 100px; height: auto;">`))
         .addTo(map);
 });
 
@@ -168,7 +198,7 @@ document.querySelectorAll('.delete-button').forEach(button => {
     const teamHash = this.getAttribute('data-hash');
     if (confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
-        const response = await fetch(`/team/${teamHash}/delete?filename=${filename}`, {
+        const response = await fetch(`{{ url_for('delete_image', short_id='') }}${teamHash}?filename=${filename}`, {
           method: 'DELETE'
         });
         if (response.ok) {
@@ -186,6 +216,7 @@ document.querySelectorAll('.delete-button').forEach(button => {
 
 // Handle file input change
 const fileInput = document.getElementById('fileInput');
+if (fileInput) {
 fileInput.addEventListener('change', async function(event) {
   const files = Array.from(event.target.files);
   const imagePreviewContainer = document.getElementById('imagePreviewContainer');
@@ -256,6 +287,27 @@ fileInput.addEventListener('change', async function(event) {
     }
   }
 });
+}
+
+// Function to copy public link
+window.copyPublicLink = function() {
+  const linkInput = document.getElementById('publicLink');
+  linkInput.select();
+  document.execCommand('copy');
+
+  const button = event.target.closest('button');
+  const originalText = button.innerHTML;
+  button.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon> Copied!';
+  button.classList.remove('btn-outline-secondary');
+  button.classList.add('btn-success');
+
+  setTimeout(() => {
+    button.innerHTML = originalText;
+    button.classList.remove('btn-success');
+    button.classList.add('btn-outline-secondary');
+  }, 2000);
+};
+
 </script>
 </body>
 </html>
