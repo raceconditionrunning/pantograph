@@ -26,7 +26,7 @@
 
                     <div class="d-grid gap-3">
                         {% for provider in providers %}
-                        <a href="{{ url_for('oauth_login', provider=provider.name) }}" class="btn btn-primary btn-lg">
+                        <a href="{{ url_for('oauth_login', provider=provider.name, next=next_url) }}" class="btn btn-primary btn-lg">
                             <ion-icon name="logo-{{ provider.name }}" class="me-2"></ion-icon>
                             Continue with {{ provider.display_name }}
                         </a>

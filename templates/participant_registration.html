@@ -15,7 +15,7 @@
             <div class="card shadow-sm">
                 <div class="card-header">
                     <h3 class="card-title mb-0">
-                        <ion-icon name="people-circle" class="me-2"></ion-icon>
+                        <ion-icon name="person-add" class="me-2"></ion-icon>
                         {% if mode == 'edit' %}
                             Edit Registration
                         {% else %}
@@ -27,11 +27,20 @@
                     <div id="alert-container"></div>
 
                     {% if mode == 'edit' %}
+                        {% set is_form_disabled = (existing_team and existing_team.status == 'cancelled') or (existing_team and existing_team.status == 'withdrawn') or (existing_membership and existing_membership.status == 'removed') or (existing_membership and existing_membership.status == 'withdrawn') %}
+
                         {% if existing_team and existing_team.status == 'withdrawn' %}
                         <div class="alert alert-danger" role="alert">
                             <ion-icon name="warning" class="me-2"></ion-icon>
                             <strong>Team has been withdrawn.</strong><br>
                             The team "{{ existing_team.name }}" has been withdrawn from the event. You cannot edit your preferences or participate with this team anymore.
+                            <a href="{{ url_for('join_team') }}" class="alert-link">Join a different team</a> to continue participating.
+                        </div>
+                        {% elif existing_team and existing_team.status == 'cancelled' %}
+                        <div class="alert alert-danger" role="alert">
+                            <ion-icon name="close-circle" class="me-2"></ion-icon>
+                            <strong>Team has been cancelled.</strong><br>
+                            The team "{{ existing_team.name }}" has been cancelled from the event. You cannot edit your preferences or participate with this team anymore.
                             <a href="{{ url_for('join_team') }}" class="alert-link">Join a different team</a> to continue participating.
                         </div>
                         {% elif existing_membership and existing_membership.status == 'removed' %}
@@ -75,15 +84,41 @@
                         <ion-icon name="warning" class="me-2"></ion-icon>
                         {{ error_message }}
                     </div>
-                    {% elif (not teams or (existing_team and teams|selectattr('id', 'ne', existing_team.id)|list|length == 0)) and mode != 'edit' %}
+                    {% elif (not teams or (existing_team and teams|selectattr('id', 'ne', existing_team.id)|list|length == 0)) and mode != 'edit' and not pending_captain_team and not invited_team %}
                     <div class="alert alert-info" role="alert">
                         <ion-icon name="information-circle" class="me-2"></ion-icon>
-                        No teams are currently open for joining.
+                        No teams are currently open for joining. Why not <a href="{{ url_for('create_team') }}">create one</a>?
                     </div>
                     {% else %}
 
                     <form id="join-team-form">
-                        {% if mode != 'edit' %}
+                        {% if invited_team %}
+                        {# User arrived via an invite link #}
+                        <input type="hidden" name="invite_token" value="{{ request.args.get('invite_token') }}">
+                        <input type="hidden" name="team_id" value="{{ invited_team.id }}">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <ion-icon name="flag" class="me-1"></ion-icon>
+                                Team
+                            </label>
+                            <p class="form-control-plaintext ps-2"><strong>{{ invited_team.name }}</strong> (Captain: {{ invited_team.captain.name }})</p>
+                            <div class="form-text">You were invited to join this team. Fill out your preferences below.</div>
+                        </div>
+
+                        {% elif pending_captain_team %}
+                        {# Captain is filling out preferences for their newly created, pending team #}
+                        <input type="hidden" name="team_id" value="{{ pending_captain_team.id }}">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <ion-icon name="flag" class="me-1"></ion-icon>
+                                Your Team
+                            </label>
+                            <p class="form-control-plaintext ps-2"><strong>{{ pending_captain_team.name }}</strong></p>
+                            <div class="alert alert-info mt-2">Your team is pending admin approval. Please fill out your preferences below to complete your registration.</div>
+                        </div>
+
+
+                        {% elif mode != 'edit' %}
                         <div class="mb-3">
                             <label for="team_id" class="form-label">
                                 <ion-icon name="flag" class="me-1"></ion-icon>
@@ -120,7 +155,7 @@
                                 <ion-icon name="compass" class="me-1"></ion-icon>
                                 Are you willing to lead your legs? <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" id="willing_to_lead" name="willing_to_lead" required {% if mode == 'edit' and ((existing_membership and existing_membership.status in ['withdrawn', 'removed']) or (existing_team and existing_team.status == 'withdrawn')) %}disabled{% endif %}>
+                            <select class="form-select" id="willing_to_lead" name="willing_to_lead" required {% if is_form_disabled %}disabled{% endif %}>
                                 <option value="">Select...</option>
                                 <option value="yes" {% if mode == 'edit' and existing_membership and existing_membership.willing_to_lead %}selected{% endif %}>Yes</option>
                                 <option value="no" {% if mode == 'edit' and existing_membership and not existing_membership.willing_to_lead %}selected{% endif %}>No</option>
@@ -134,7 +169,7 @@
                                 How many miles would you like to run? <span class="text-danger">*</span>
                             </label>
                             <input type="number" class="form-control" id="preferred_miles" name="preferred_miles"
-                                   min="0.1" max="36" step="0.1" required {% if mode == 'edit' and existing_membership %}value="{{ existing_membership.preferred_miles }}"{% endif %} {% if mode == 'edit' and ((existing_membership and existing_membership.status in ['withdrawn', 'removed']) or (existing_team and existing_team.status == 'withdrawn')) %}disabled{% endif %}>
+                                   min="0.1" max="36" step="0.1" required {% if mode == 'edit' and existing_membership %}value="{{ existing_membership.preferred_miles }}"{% endif %} {% if is_form_disabled %}disabled{% endif %}>
                             <div class="form-text">Enter a number between 0.1 and 36</div>
                         </div>
 
@@ -144,7 +179,7 @@
                                 What pace per mile would you plan to run your preferred distance? <span class="text-danger">*</span>
                             </label>
                             <input type="text" class="form-control" id="planned_pace" name="planned_pace"
-                                   placeholder="7:30" pattern="^\d{1,2}:\d{2}$" required {% if mode == 'edit' and existing_membership %}value="{{ existing_membership.planned_pace }}"{% endif %} {% if mode == 'edit' and ((existing_membership and existing_membership.status in ['withdrawn', 'removed']) or (existing_team and existing_team.status == 'withdrawn')) %}disabled{% endif %}>
+                                   placeholder="7:30" pattern="^\d{1,2}:\d{2}$" required {% if mode == 'edit' and existing_membership %}value="{{ existing_membership.planned_pace }}"{% endif %} {% if is_form_disabled %}disabled{% endif %}>
                             <div class="form-text">Format: MM:SS (e.g., 7:30 for 7 minutes 30 seconds per mile). Your captain will adjust times to account for the elevation and street conditions of each leg.</div>
                         </div>
 
@@ -153,7 +188,7 @@
                                 <ion-icon name="train" class="me-1"></ion-icon>
                                 Which station is closest to where you'd like to finish?
                             </label>
-                            <select class="form-select" id="preferred_station" name="preferred_station" {% if mode == 'edit' and ((existing_membership and existing_membership.status in ['withdrawn', 'removed']) or (existing_team and existing_team.status == 'withdrawn')) %}disabled{% endif %}>
+                            <select class="form-select" id="preferred_station" name="preferred_station" {% if is_form_disabled %}disabled{% endif %}>
                                 <option value="">No Preference</option>
                                 {% for station in stations %}
                                 <option value="{{ station }}" {% if mode == 'edit' and existing_membership and existing_membership.preferred_station == station %}selected{% endif %}>{{ station }}</option>
@@ -168,8 +203,19 @@
                                 Any notes or comments for scheduling?
                             </label>
                             <textarea class="form-control" id="comments" name="comments" rows="3"
-                                      placeholder="Please let us know if you have hard constraints that would prevent your participation..." {% if mode == 'edit' and ((existing_membership and existing_membership.status in ['withdrawn', 'removed']) or (existing_team and existing_team.status == 'withdrawn')) %}disabled{% endif %}>{% if mode == 'edit' and existing_membership %}{{ existing_membership.comments or '' }}{% endif %}</textarea>
+                                      placeholder="Please let us know if you have hard constraints that would prevent your participation..." {% if is_form_disabled %}disabled{% endif %}>{% if mode == 'edit' and existing_membership %}{{ existing_membership.comments or '' }}{% endif %}</textarea>
                             <div class="form-text">Share any scheduling constraints, preferences, or other relevant information</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if mode == 'edit' and current_user.email_opt_in %}checked{% endif %} {% if is_form_disabled %}disabled{% endif %}>
+                                <label class="form-check-label" for="email_opt_in">
+                                    <ion-icon name="mail-outline" class="me-1"></ion-icon>
+                                    Opt-in for information about the next event.
+                                </label>
+                                <div class="form-text">We'll only email you about the next official running event.</div>
+                            </div>
                         </div>
 
                         {% if mode != 'edit' %}
@@ -178,7 +224,7 @@
                                 <ion-icon name="document-text" class="me-2"></ion-icon>
                                 Waiver Agreement
                             </h5>
-                            <div class="card bg-light">
+                            <div class="card bg-secondary">
                                 <div class="card-body">
                                     <p class="card-text text-muted">
                                         <em>Waiver text will be provided here...</em>
@@ -197,10 +243,10 @@
                         {% endif %}
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            {% if mode == 'edit' and existing_membership %}
+                            {% if mode == 'edit' and existing_membership and not is_form_disabled %}
                                 {% if existing_team and existing_team.status == 'withdrawn' %}
                                     {% if current_user.is_captain_of(existing_team) %}
-                                    <button type="button" class="btn btn-outline-success" onclick="unwithdrawTeam('{{ existing_team.name }}', '{{ existing_team.short_id }}')">
+                                    <button type="button" class="btn btn-outline-success" onclick="unwithdrawTeam('{{ existing_team.name }}', '{{ existing_team.id }}')">
                                         <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>
                                         Un-withdraw Team
                                     </button>
@@ -224,7 +270,7 @@
                                     Update Preferences
                                 </button>
                                 {% endif %}
-                            {% else %}
+                            {% elif mode != 'edit' %}
                             <button type="submit" class="btn btn-primary" id="submit-btn">
                                 <ion-icon name="person-add" class="me-1"></ion-icon>
                                 Join Team
@@ -241,6 +287,8 @@
 </div>
 
 <script type="module">
+import { membershipAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
+
 // Handle team selection changes to show/hide password field
 const teamSelect = document.getElementById('team_id');
 const passwordSection = document.getElementById('password-section');
@@ -267,14 +315,11 @@ if (teamSelect && passwordSection) {
     updatePasswordField();
 }
 
-// Format pace input as user types
-document.getElementById('planned_pace').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/[^\d]/g, ''); // Remove non-digits
-    if (value.length >= 3) {
-        value = value.substring(0, value.length - 2) + ':' + value.substring(value.length - 2);
-    }
-    e.target.value = value;
-});
+// Format pace input as user types using shared utility
+const plannedPaceInput = document.getElementById('planned_pace');
+if (plannedPaceInput) {
+    Utils.formatTimeInput(plannedPaceInput, 99);
+}
 
 document.getElementById('join-team-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -282,114 +327,52 @@ document.getElementById('join-team-form').addEventListener('submit', async funct
     const submitBtn = document.getElementById('submit-btn');
     const alertContainer = document.getElementById('alert-container');
 
-    // Disable submit button and show loading
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Joining...';
-
     // Clear previous alerts
-    alertContainer.innerHTML = '';
+    api.clearAlerts(alertContainer);
 
-    try {
-        const formData = new FormData(this);
-        const currentPath = window.location.pathname;
-        const submitUrl = currentPath === '{{ url_for('my_registration') }}' ? '{{ url_for('my_registration') }}' : '{{ url_for('join_team') }}';
-        const response = await fetch(submitUrl, {
-            method: 'POST',
-            body: formData
-        });
+    // Determine which endpoint to use
+    const currentPath = window.location.pathname;
+    const isEditing = currentPath === '{{ url_for('my_registration') }}';
 
-        const result = await response.json();
+    let result;
+    if (isEditing) {
+        result = await membershipAPI.updateMembership(new FormData(this));
+    } else {
+        result = await membershipAPI.joinTeam(new FormData(this));
+    }
 
-        if (response.ok && result.success) {
-            // Show success message
-            alertContainer.innerHTML = `
-                <div class="alert alert-success" role="alert">
-                    <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
-                    ${result.message}
-                </div>
-            `;
+    if (result.success) {
+        // Show success message
+        api.showAlert(alertContainer, 'success', result.data.message, 'checkmark-circle');
 
-            // Redirect after a short delay
-            setTimeout(() => {
-                window.location.href = result.redirect_url || '{{ url_for("index") }}';
-            }, 2000);
-
-        } else {
-            // Show error message
-            alertContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <ion-icon name="warning" class="me-2"></ion-icon>
-                    ${result.error || 'Failed to join team'}
-                </div>
-            `;
-        }
-    } catch (error) {
-        alertContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                <ion-icon name="warning" class="me-2"></ion-icon>
-                Network error. Please try again.
-            </div>
-        `;
-    } finally {
-        // Re-enable submit button
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<ion-icon name="person-add" class="me-1"></ion-icon>Join Team';
+        // Redirect after a short delay
+        api.redirectAfterDelay(result.data.redirect_url || '{{ url_for("index") }}');
+    } else {
+        // Show error message
+        api.showAlert(alertContainer, 'danger', result.error || 'Failed to submit form', 'warning');
     }
 });
 
-// Make withdrawMembership globally accessible
-window.withdrawMembership = function(membershipId) {
+// Membership management functions using shared API client
+window.withdrawMembership = async function(membershipId) {
     if (!confirm('Are you sure you want to withdraw from this team? This action will mark your registration as withdrawn.')) {
         return;
     }
 
-    fetch(`{{ url_for('withdraw_membership', short_id='TEAM_ID', membership_id='999999') }}`.replace('TEAM_ID', '{{ existing_team.short_id if existing_team else "" }}').replace('999999', `${membershipId}`), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show success alert
-            const alertContainer = document.getElementById('alert-container');
-            alertContainer.innerHTML = `
-                <div class="alert alert-success" role="alert">
-                    <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
-                    ${data.message}
-                </div>
-            `;
+    const result = await membershipAPI.withdrawMembership('{{ existing_team.id if existing_team else "" }}', membershipId);
 
-            // Redirect after a short delay
-            setTimeout(() => {
-                window.location.href = '{{ url_for("index") }}';
-            }, 2000);
-        } else {
-            // Show error alert
-            const alertContainer = document.getElementById('alert-container');
-            alertContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <ion-icon name="warning" class="me-2"></ion-icon>
-                    ${data.error || 'Failed to withdraw membership'}
-                </div>
-            `;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        const alertContainer = document.getElementById('alert-container');
-        alertContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                <ion-icon name="warning" class="me-2"></ion-icon>
-                An error occurred while withdrawing membership
-            </div>
-        `;
-    });
+    if (result.success) {
+        // Show success alert
+        api.showAlert('alert-container', 'success', result.data.message, 'checkmark-circle');
+        // Redirect after a short delay
+        api.redirectAfterDelay('{{ url_for("index") }}');
+    } else {
+        // Show error alert
+        api.showAlert('alert-container', 'danger', result.error || 'Failed to withdraw membership', 'warning');
+    }
 };
 
-// Make unwithdrawMembership globally accessible
-window.unwithdrawMembership = function(membershipId) {
+window.unwithdrawMembership = async function(membershipId) {
     if (!confirm('Are you sure you want to re-join this team? This will reactivate your membership.')) {
         return;
     }
@@ -397,111 +380,43 @@ window.unwithdrawMembership = function(membershipId) {
     const unwithdrawBtn = document.getElementById('unwithdraw-btn');
     const alertContainer = document.getElementById('alert-container');
 
-    // Disable button and show loading
-    unwithdrawBtn.disabled = true;
-    unwithdrawBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Re-joining...';
+    // Show loading state using shared API client
+    api.setButtonLoading(unwithdrawBtn, 'Re-joining...');
 
-    fetch(`{{ url_for('unwithdraw_membership', short_id='TEAM_ID', membership_id='999999') }}`.replace('TEAM_ID', '{{ existing_team.short_id if existing_team else "" }}').replace('999999', `${membershipId}`), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show success alert
-            alertContainer.innerHTML = `
-                <div class="alert alert-success" role="alert">
-                    <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
-                    ${data.message}
-                </div>
-            `;
+    const result = await membershipAPI.unwithdrawMembership('{{ existing_team.id if existing_team else "" }}', membershipId);
 
-            // Redirect after a short delay to refresh the page
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } else {
-            // Show error alert
-            alertContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <ion-icon name="warning" class="me-2"></ion-icon>
-                    ${data.error || 'Failed to re-join team'}
-                </div>
-            `;
-
-            // Re-enable button
-            unwithdrawBtn.disabled = false;
-            unwithdrawBtn.innerHTML = '<ion-icon name="checkmark-circle" class="me-1"></ion-icon>Re-join Team';
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alertContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                <ion-icon name="warning" class="me-2"></ion-icon>
-                An error occurred while re-joining the team
-            </div>
-        `;
-
-        // Re-enable button
-        unwithdrawBtn.disabled = false;
-        unwithdrawBtn.innerHTML = '<ion-icon name="checkmark-circle" class="me-1"></ion-icon>Re-join Team';
-    });
+    if (result.success) {
+        // Show success alert
+        api.showAlert(alertContainer, 'success', result.data.message, 'checkmark-circle');
+        // Redirect after a short delay to refresh the page
+        api.redirectAfterDelay(window.location.href);
+    } else {
+        // Show error alert
+        api.showAlert(alertContainer, 'danger', result.error || 'Failed to re-join team', 'warning');
+        // Reset button
+        api.resetButton(unwithdrawBtn);
+    }
 };
 
-// Make unwithdrawTeam globally accessible
-window.unwithdrawTeam = function (teamName, shortId) {
+window.unwithdrawTeam = async function(teamName, shortId) {
     if (!confirm(`Are you sure you want to un-withdraw team "${teamName}" and re-enter the event?`)) {
         return;
     }
 
-    fetch(`{{ url_for('unwithdraw_team', short_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show success alert
-            const alertContainer = document.getElementById('alert-container');
-            alertContainer.innerHTML = `
-                <div class="alert alert-success" role="alert">
-                    <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
-                    ${data.message}
-                </div>
-            `;
+    const result = await teamAPI.unwithdrawTeam(shortId);
 
-            // Redirect after a short delay
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } else {
-            // Show error alert
-            const alertContainer = document.getElementById('alert-container');
-            alertContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <ion-icon name="warning" class="me-2"></ion-icon>
-                    ${data.error || 'Failed to un-withdraw team'}
-                </div>
-            `;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        const alertContainer = document.getElementById('alert-container');
-        alertContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                <ion-icon name="warning" class="me-2"></ion-icon>
-                An error occurred while un-withdrawing team
-            </div>
-        `;
-    });
+    if (result.success) {
+        // Show success alert
+        api.showAlert('alert-container', 'success', result.data.message, 'checkmark-circle');
+        // Redirect after a short delay
+        api.redirectAfterDelay(window.location.href);
+    } else {
+        // Show error alert
+        api.showAlert('alert-container', 'danger', result.error || 'Failed to un-withdraw team', 'warning');
+    }
 };
 </script>
+{% include '_footer.html' %}
 
 </body>
 </html>

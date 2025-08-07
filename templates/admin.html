@@ -9,14 +9,13 @@
 <div class="container mt-4 mb-4">
     {% include '_navbar.html' %}
 
-    <h1>Team Management</h1>
-    <p class="text-muted">Manage teams and view upload statistics</p>
+    <h1>Admin</h1>
 
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Teams Overview</h5>
+                    <h5 class="card-title mb-0">Teams</h5>
                 </div>
                 <div class="card-body">
                     {% if teams %}
@@ -28,18 +27,19 @@
                                     <th>Status</th>
                                     <th>Members</th>
                                     <th>Photos</th>
-                                    <th>Team URL</th>
+                                    <th>Comments</th>
+                                    <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for team in teams %}
                                 <tr>
-                                    <td><strong>{{ team.name }}</strong></td>
+                                    <td><strong>{{ team.name }}</strong>{% if team.format == 'Solo' %} <span class="text-muted">(Solo)</span>{% endif %}</td>
                                     <td>
                                         {% if team.status == 'pending' %}
                                         <span class="badge bg-warning">
-                                            <ion-icon name="time-outline" class="me-1"></ion-icon>Pending
+                                            <ion-icon name="hourglass-outline" class="me-1"></ion-icon>Pending
                                         </span>
                                         {% elif team.status == 'complete' %}
                                         <span class="badge bg-success">
@@ -49,41 +49,60 @@
                                         <span class="badge bg-secondary">
                                             <ion-icon name="close-circle-outline" class="me-1"></ion-icon>Withdrawn
                                         </span>
+                                        {% elif team.status == 'cancelled' %}
+                                        <span class="badge bg-danger">
+                                            <ion-icon name="ban-outline" class="me-1"></ion-icon>Cancelled
+                                        </span>
+                                        {% elif team.status == 'closed' %}
+                                        <span class="badge bg-warning">
+                                            <ion-icon name="lock-closed-outline" class="me-1"></ion-icon>Closed
+                                        </span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {{ team.member_count }}
+                                        <a href="{{ url_for('team_members', team_id=team.id) }}" target="_blank" class="text-decoration-none">
+                                            {{ team.member_count }}
+                                        </a>
                                     </td>
                                     <td>
-                                        {{ team.image_count }}
+                                        <a href="{{ team.url }}" target="_blank" class="text-decoration-none">
+                                            {{ team.image_count }}
+                                        </a>
                                     </td>
                                     <td>
-                                        <code>/team/{{ team.short_id }}</code>
+                                        {% if team.comments %}
+                                        <span class="text-truncate d-inline-block" style="max-width: 150px;" title="{{ team.comments }}">{{ team.comments }}</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
                                     </td>
                                     <td>
-                                        <div class="btn-group" role="group">
-                                            <a href="{{ team.url }}" class="btn btn-sm btn-primary" target="_blank">
-                                                <ion-icon name="images-outline"></ion-icon> Gallery
-                                            </a>
-                                            <a href="{{ url_for('team_members', short_id=team.short_id) }}" class="btn btn-sm btn-info" target="_blank">
-                                                <ion-icon name="people-outline"></ion-icon> Members
-                                            </a>
-                                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ request.url_root }}team/{{ team.short_id }}')">
-                                                <ion-icon name="copy-outline"></ion-icon> Copy URL
+                                        <small class="text-muted">{{ team.created_at.strftime('%m/%d/%y') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
                                             </button>
-                                            {% if team.status == 'pending' %}
-                                            <button class="btn btn-sm btn-success" onclick="approveTeam('{{ team.name }}', '{{ team.short_id }}')">
-                                                <ion-icon name="checkmark-outline"></ion-icon> Approve
-                                            </button>
-                                            {% endif %}
-                                            {% if team.status != 'withdrawn' %}
-                                            <button class="btn btn-sm btn-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.short_id }}')">
-                                                <ion-icon name="close-outline"></ion-icon> Withdraw
-                                            </button>
-                                            {% endif %}
-                                            <button class="btn btn-sm btn-danger" onclick="confirmDeleteTeam('{{ team.name }}', '{{ team.short_id }}')">
-                                                <ion-icon name="trash-outline"></ion-icon> Delete
-                                            </button>
+                                            <ul class="dropdown-menu">
+                                                {% if team.status == 'pending' %}
+                                                <li><a class="dropdown-item text-success" href="#" onclick="approveTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    <ion-icon name="checkmark-outline" class="me-2"></ion-icon>Approve
+                                                </a></li>
+                                                <li><a class="dropdown-item text-warning" href="#" onclick="cancelTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    <ion-icon name="ban-outline" class="me-2"></ion-icon>Cancel
+                                                </a></li>
+                                                {% endif %}
+                                                {% if team.status != 'withdrawn' and team.status != 'cancelled' %}
+                                                <li><a class="dropdown-item text-warning" href="#" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    <ion-icon name="close-outline" class="me-2"></ion-icon>Withdraw
+                                                </a></li>
+                                                {% endif %}
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeleteTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    <ion-icon name="trash-outline" class="me-2"></ion-icon>Delete
+                                                </a></li>
+                                            </ul>
                                         </div>
                                     </td>
                                 </tr>
@@ -102,6 +121,107 @@
     </div>
 
     <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Users</h5>
+                </div>
+                <div class="card-body">
+                    {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Team Membership</th>
+                                    <th>Status</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if user.avatar_url %}
+                                                <img src="{{ user.avatar_url }}" alt="{{ user.name }}"
+                                                     class="rounded-circle me-3" width="40" height="40">
+                                            {% else %}
+                                                <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                     style="width: 40px; height: 40px;">
+                                                    <span class="text-white fw-bold">{{ user.name[0].upper() }}</span>
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ user.name }}</strong>
+                                                {% if user.is_admin %}
+                                                    <span class="badge bg-danger ms-2">Admin</span>
+                                                {% endif %}
+                                                <a href="mailto:{{ user.email }}" class="link-secondary text-decoration-none d-block">
+                                                    <small>{{ user.email }}</small>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if user.active_memberships %}
+                                            {% for membership in user.active_memberships %}
+                                                <div class="mb-1">
+                                                    <a href="{{ url_for('team_members', team_id=membership.team.id) }}"
+                                                       target="_blank" class="text-decoration-none">
+                                                        <strong>{{ membership.team.name }}</strong>
+                                                    </a>
+                                                    {% if membership.user_id == membership.team.captain_id %}
+                                                        <span class="badge bg-success ms-1">Captain</span>
+                                                    {% endif %}
+                                                    {% if membership.willing_to_lead %}
+                                                        <span class="badge bg-warning text-dark ms-1">Leg Leader</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">No active team</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Active</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ user.created_at.strftime('%m/%d/%y') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="{{ url_for('my_registration') }}?user_id={{ user.id }}" target="_blank">
+                                                    <ion-icon name="settings-outline" class="me-2"></ion-icon>View Preferences
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeleteUser('{{ user.name }}', '{{ user.id }}')">
+                                                    <ion-icon name="trash-outline" class="me-2"></ion-icon>Delete User
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info" role="alert">
+                        No users yet.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
@@ -111,6 +231,8 @@
                     <dl class="row">
                         <dt class="col-sm-6">Total Teams:</dt>
                         <dd class="col-sm-6">{{ teams|length }}</dd>
+                        <dt class="col-sm-6">Total Users:</dt>
+                        <dd class="col-sm-6">{{ users|length }}</dd>
                         <dt class="col-sm-6">Total Photos:</dt>
                         <dd class="col-sm-6">{{ teams|sum(attribute='image_count') }}</dd>
                         <dt class="col-sm-6">Active Teams:</dt>
@@ -129,15 +251,54 @@
                     <ul>
                         <li><span class="badge bg-warning">Pending</span>: New teams await admin approval</li>
                         <li><span class="badge bg-success">Complete</span>: Approved teams open for joining</li>
+                        <li><span class="badge bg-warning">Closed</span>: Teams closed to new registrations</li>
                         <li><span class="badge bg-secondary">Withdrawn</span>: Teams withdrawn from event</li>
+                        <li><span class="badge bg-danger">Cancelled</span>: Permanently cancelled pending teams</li>
                     </ul>
                     <p><strong>Admin Actions:</strong></p>
                     <ul>
                         <li><strong>Approve</strong>: Change pending teams to complete status</li>
+                        <li><strong>Cancel</strong>: Permanently cancel pending teams</li>
                         <li><strong>Withdraw</strong>: Mark teams as withdrawn</li>
                         <li><strong>Delete</strong>: Permanently remove team and data</li>
                     </ul>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete User Confirmation Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUserModalLabel">
+                    <ion-icon name="warning-outline" class="text-danger me-2"></ion-icon>
+                    Delete User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>⚠ Warning: This action cannot be undone!</strong>
+                </div>
+                <p>You are about to permanently delete the user <strong id="deleteUserName"></strong>.</p>
+                <p>This will:</p>
+                <ul>
+                    <li>Remove the user from all teams</li>
+                    <li>Delete their account and preferences</li>
+                    <li>Remove all their team memberships</li>
+                    <li>Remove them from the database</li>
+                </ul>
+                <p>Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUserBtn" disabled>
+                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                    Delete User
+                </button>
             </div>
         </div>
     </div>
@@ -179,33 +340,81 @@
     </div>
 </div>
 
-<script>
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(function() {
-        // Create a toast notification
-        const toast = document.createElement('div');
-        toast.className = 'toast align-items-center text-bg-success border-0 position-fixed';
-        toast.style.cssText = 'top: 20px; right: 20px; z-index: 1055;';
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">URL copied to clipboard!</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-        document.body.appendChild(toast);
-
-        // Show and auto-hide the toast
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
-    });
-}
+<script type="module">
+import * as bootstrap from 'bootstrap';
+import { userAPI, teamAPI, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
 let currentShortId = null;
+let currentUserId = null;
 
-function confirmDeleteTeam(teamName, shortId) {
+// Copy to clipboard using shared utility
+window.copyToClipboard = async function(text) {
+    const success = await Utils.copyToClipboard(text);
+    if (success) {
+        showToast('URL copied to clipboard!', 'success');
+    } else {
+        showToast('Failed to copy URL', 'danger');
+    }
+}
+
+// User deletion functions
+window.confirmDeleteUser = function(userName, userId) {
+    currentUserId = userId;
+    document.getElementById('deleteUserName').textContent = userName;
+
+    // Enable delete button after 3 seconds
+    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+
+    setTimeout(() => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete User';
+    }, 3000);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+    modal.show();
+
+    // Add click handler for delete button
+    deleteBtn.onclick = function() {
+        deleteUser(currentUserId);
+    };
+}
+
+window.deleteUser = async function(userId) {
+    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
+
+    // Show loading state
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+
+    const result = await userAPI.deleteUser(userId);
+
+    if (result.success) {
+        // Show success toast
+        showToast(result.data.message, 'success');
+
+        // Hide modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
+        modal.hide();
+
+        // Reload page after short delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    } else {
+        // Show error toast
+        showToast(result.error || 'Failed to delete user', 'danger');
+
+        // Reset button
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete User';
+    }
+}
+
+// Team deletion functions
+window.confirmDeleteTeam = function(teamName, shortId) {
     currentShortId = shortId;
     document.getElementById('deleteTeamName').textContent = teamName;
 
@@ -229,111 +438,96 @@ function confirmDeleteTeam(teamName, shortId) {
     };
 }
 
-function deleteTeam(shortId) {
+window.deleteTeam = async function(shortId) {
     const deleteBtn = document.getElementById('confirmDeleteBtn');
 
     // Show loading state
     deleteBtn.disabled = true;
     deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
 
-    fetch(`{{ url_for('delete_team', short_id='') }}${shortId}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Show success toast
-            showToast(data.message, 'success');
+    const result = await teamAPI.deleteTeam(shortId);
 
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteTeamModal'));
-            modal.hide();
+    if (result.success) {
+        // Show success toast
+        showToast(result.data.message, 'success');
 
-            // Reload page after short delay
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            // Show error toast
-            showToast(data.error || 'Failed to delete team', 'danger');
+        // Hide modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteTeamModal'));
+        modal.hide();
 
-            // Reset button
-            deleteBtn.disabled = false;
-            deleteBtn.innerHTML = 'Delete Team';
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('An error occurred while deleting the team', 'danger');
+        // Reload page after short delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    } else {
+        // Show error toast
+        showToast(result.error || 'Failed to delete team', 'danger');
 
         // Reset button
         deleteBtn.disabled = false;
         deleteBtn.innerHTML = 'Delete Team';
-    });
+    }
 }
 
-function approveTeam(teamName, shortId) {
+// Team management functions
+window.approveTeam = async function(teamName, teamId) {
     if (!confirm(`Are you sure you want to approve team "${teamName}"?`)) {
         return;
     }
 
-    fetch(`{{ url_for('approve_team', short_id='') }}${shortId}`, {
+    const result = await fetch(`{{ url_for('approve_team', team_id='TEMP_TEAM_ID') }}`.replace("TEMP_TEAM_ID", teamId), {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast(data.message, 'success');
-            // Reload page after short delay
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            showToast(data.error || 'Failed to approve team', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('An error occurred while approving the team', 'danger');
+        headers: { 'Content-Type': 'application/json' }
     });
+
+    const data = await result.json();
+
+    if (result.ok && data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => window.location.reload(), 1500);
+    } else {
+        showToast(data.error || 'Failed to approve team', 'danger');
+    }
 }
 
-function withdrawTeam(teamName, shortId) {
+window.withdrawTeam = async function(teamName, shortId) {
     if (!confirm(`Are you sure you want to withdraw team "${teamName}"?`)) {
         return;
     }
 
-    fetch(`{{ url_for('withdraw_team', short_id='') }}${shortId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showToast(data.message, 'success');
-            // Reload page after short delay
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            showToast(data.error || 'Failed to withdraw team', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showToast('An error occurred while withdrawing the team', 'danger');
-    });
+    const result = await teamAPI.withdrawTeam(shortId);
+
+    if (result.success) {
+        showToast(result.data.message, 'success');
+        setTimeout(() => window.location.reload(), 1500);
+    } else {
+        showToast(result.error || 'Failed to withdraw team', 'danger');
+    }
 }
 
-function showToast(message, type = 'success') {
+window.cancelTeam = async function(teamName, shortId) {
+    if (!confirm(`Are you sure you want to cancel team "${teamName}"? This action is permanent and cannot be undone.`)) {
+        return;
+    }
+
+    // Custom cancel endpoint - extend TeamAPI if needed
+    const result = await fetch(`{{ url_for('cancel_team', team_id='TEMP_TEAM_ID') }}`.replace("TEMP_TEAM_ID", shortId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await result.json();
+
+    if (result.ok && data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => window.location.reload(), 1500);
+    } else {
+        showToast(data.error || 'Failed to cancel team', 'danger');
+    }
+}
+
+// Toast notification using Bootstrap
+window.showToast = function(message, type = 'success') {
     const bgClass = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
     const toast = document.createElement('div');
     toast.className = `toast align-items-center ${bgClass} border-0 position-fixed`;
@@ -355,5 +549,6 @@ function showToast(message, type = 'success') {
 }
 </script>
 
+{% include '_footer.html' %}
 </body>
 </html>

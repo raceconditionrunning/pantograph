@@ -2,38 +2,59 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
-    <title>{{ team.name }} - Team Members</title>
+    <title>{{ team.name }} - {% if team.format == 'Solo' %}My Entry{% else %}Team Members{% endif %}</title>
 </head>
 <body>
 
     <div class="container mt-4">
         {% include '_navbar.html' %}
 
-        <!-- Withdrawn Team Warning -->
-        {% if team.status == 'withdrawn' %}
-        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            <ion-icon name="warning-outline" class="me-2"></ion-icon>
-            <strong>Team Withdrawn:</strong> Your captain has withdrawn the team from the event.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <!-- Pending Team Warning -->
+        {% if team.status == 'pending' %}
+        <div class="alert alert-warning">
+            <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
+            {% if team.format == 'Solo' %}
+                <strong>Solo Entry Pending Approval</strong><br>
+                Your solo registration is awaiting admin approval.
+                <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
+                {% if not team.has_baton %}
+                <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
+                {% endif %}
+            {% else %}
+                <strong>Team Registration Pending Approval</strong><br>
+                Your team registration is awaiting admin approval. Until approved:
+                <ul class="mb-0 mt-2">
+                    <li>Other users cannot join this team</li>
+                    <li>The team will not appear in the public team list</li>
+                    <li>Photo uploads are disabled</li>
+                </ul>
+                <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
+                {% if not team.has_baton %}
+                <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
+                {% endif %}
+            {% endif %}
         </div>
         {% endif %}
 
-        <div class="row mb-4">
-            <div class="col">
-                <h1>{{ team.name }}</h1>
-                <div class="d-flex gap-2 mb-3">
-
-                    {% if current_user.is_captain_of(team) %}
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#inviteModal">
-                            <ion-icon name="person-add-outline"></ion-icon> Invite Members
-                        </button>
-                    {% endif %}
-                </div>
-            </div>
+        <!-- Cancelled Team Warning -->
+        {% if team.status == 'cancelled' %}
+        <div class="alert alert-secondary">
+            <ion-icon name="ban-outline" class="me-2"></ion-icon>
+            <strong>Team Cancelled:</strong> The captain has canceled this team's registration. Please <a href="{{ url_for('join_team') }}">join another</a> or create a <a href="{{ url_for('create_team')}}">new team</a> if you'd like to participate.
         </div>
+        {% endif %}
+
+        <!-- Withdrawn Team Warning -->
+        {% if team.status == 'withdrawn' %}
+        <div class="alert alert-warning" >
+            <ion-icon name="warning-outline" class="me-2"></ion-icon>
+            <strong>Team Withdrawn:</strong> Your captain has withdrawn the team from the event. Please <a href="{{ url_for('join_team') }}">join another</a> or create a <a href="{{ url_for('create_team')}}">new team</a> if you'd like to participate.
+        </div>
+        {% endif %}
 
         <div class="row">
             <div class="col-12">
+                {% if team.format == 'Team' %}
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">Team Roster ({{ active_members|length + withdrawn_members|length }})</h5>
@@ -46,7 +67,7 @@
                                         <th>Member</th>
                                         <th>Preferences</th>
                                         <th>Joined</th>
-                                        {% if current_user.is_captain_of(team) or current_user.is_admin %}
+                                        {% if permissions.can_manage_team(current_user, team) %}
                                         <th>Actions</th>
                                         {% endif %}
                                     </tr>
@@ -55,7 +76,7 @@
                                     <!-- Active Team Members -->
                                     {% if active_members %}
                                     <tr>
-                                        <td colspan="{% if current_user.is_captain_of(team) or current_user.is_admin %}4{% else %}3{% endif %}" class="fw-bold text-success px-3 py-2">
+                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-success px-3 py-2">
                                             <ion-icon name="people" class="me-2"></ion-icon>Active Members ({{ active_members|length }})
                                         </td>
                                     </tr>
@@ -83,7 +104,7 @@
                                                     {% if membership.willing_to_lead %}
                                                         <span class="badge bg-warning text-dark ms-2">Leg Leader</span>
                                                     {% endif %}
-                                                    {% if current_user.is_admin or current_user.is_captain_of(team) %}
+                                                    {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
                                                             <small>{{ membership.user.email }}</small>
                                                         </a>
@@ -115,7 +136,7 @@
                                         <td>
                                             <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
                                         </td>
-                                        {% if current_user.is_captain_of(team) or current_user.is_admin %}
+                                        {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
                                             {% if membership.user_id != team.captain_id %}
                                             <div class="dropdown">
@@ -125,7 +146,7 @@
                                                 <ul class="dropdown-menu">
                                                     {% if current_user.is_captain_of(team) %}
                                                     <li>
-                                                        <button class="dropdown-item" onclick="transferCaptaincy('{{ team.short_id }}', '{{ membership.user_id }}', '{{ membership.user.name }}')">
+                                                        <button class="dropdown-item" onclick="transferCaptaincy('{{ team.id }}', '{{ membership.user_id }}', '{{ membership.user.name }}')">
                                                             <ion-icon name="crown-outline" class="me-2"></ion-icon>Make Captain
                                                         </button>
                                                     </li>
@@ -137,6 +158,8 @@
                                                     </li>
                                                 </ul>
                                             </div>
+                                            {% else %}
+                                            <span class="text-muted">—</span>
                                             {% endif %}
                                         </td>
                                         {% endif %}
@@ -147,7 +170,7 @@
                                     <!-- Withdrawn Team Members -->
                                     {% if withdrawn_members %}
                                     <tr>
-                                        <td colspan="{% if current_user.is_captain_of(team) or current_user.is_admin %}4{% else %}3{% endif %}" class="fw-bold text-warning px-3 py-2">
+                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-warning px-3 py-2">
                                             <ion-icon name="person-remove" class="me-2"></ion-icon>Withdrawn Members ({{ withdrawn_members|length }})
                                         </td>
                                     </tr>
@@ -172,7 +195,7 @@
                                                     {% if membership.user_id == team.captain_id %}
                                                         <span class="badge bg-success ms-2">Captain</span>
                                                     {% endif %}
-                                                    {% if current_user.is_admin or current_user.is_captain_of(team) %}
+                                                    {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
                                                             <small>{{ membership.user.email }}</small>
                                                         </a>
@@ -199,9 +222,9 @@
                                         <td>
                                             <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
                                         </td>
-                                        {% if current_user.is_captain_of(team) or current_user.is_admin %}
+                                        {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
-                                            <!-- No actions for withdrawn members -->
+                                            <span class="text-muted">—</span>
                                         </td>
                                         {% endif %}
                                     </tr>
@@ -209,9 +232,9 @@
                                     {% endif %}
 
                                     <!-- Removed Team Members (Captain and Admin Only) -->
-                                    {% if removed_members and (current_user.is_captain_of(team) or current_user.is_admin) %}
+                                    {% if removed_members and (permissions.can_manage_team(current_user, team)) %}
                                     <tr>
-                                        <td colspan="{% if current_user.is_captain_of(team) or current_user.is_admin %}4{% else %}3{% endif %}" class="fw-bold text-danger px-3 py-2">
+                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-danger px-3 py-2">
                                             <ion-icon name="ban" class="me-2"></ion-icon>Removed Members ({{ removed_members|length }})
                                         </td>
                                     </tr>
@@ -233,7 +256,7 @@
                                                     {% if current_user.is_authenticated and membership.user_id == current_user.id %}
                                                         <span class="badge bg-primary ms-2">Me</span>
                                                     {% endif %}
-                                                    {% if current_user.is_admin or current_user.is_captain_of(team) %}
+                                                    {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
                                                             <small>{{ membership.user.email }}</small>
                                                         </a>
@@ -260,9 +283,9 @@
                                         <td>
                                             <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
                                         </td>
-                                        {% if current_user.is_captain_of(team) or current_user.is_admin %}
+                                        {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
-                                            <!-- No actions for removed members -->
+                                            <span class="text-muted">—</span>
                                         </td>
                                         {% endif %}
                                     </tr>
@@ -271,7 +294,7 @@
 
                                     {% if active_members|length == 0 and withdrawn_members|length == 0 %}
                                     <tr>
-                                        <td colspan="{% if current_user.is_captain_of(team) or current_user.is_admin %}4{% else %}3{% endif %}" class="text-center text-muted p-4">
+                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="text-center text-muted p-4">
                                             <ion-icon name="people-outline" style="font-size: 2rem;"></ion-icon>
                                             <p class="mt-2 mb-0">No team members yet. Share the team invite to get started!</p>
                                         </td>
@@ -284,10 +307,11 @@
                 </div>
 
             </div>
+            {% endif %}
         </div>
 
         <!-- Captain Actions Card -->
-        {% if current_user.is_captain_of(team) %}
+        {% if current_user.is_captain_of(team) and team.status != 'cancelled' %}
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
@@ -297,42 +321,138 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Team Password</h6>
-                                <p class="text-muted small">Control access to your team by setting or changing the password.</p>
-                                <form id="password-form">
-                                    <div class="input-group mb-3">
-                                        <input type="password" class="form-control" id="team_password"
-                                               placeholder="{% if team.password %}Enter new password{% else %}Set team password{% endif %}"
-                                               value="{{ team.password if team.password else '' }}">
-                                        <button class="btn btn-outline-primary" type="submit">
-                                            <ion-icon name="key-outline" class="me-1"></ion-icon>
-                                            {% if team.password %}Update{% else %}Set{% endif %}
+                        {% if team.status not in ['withdrawn', 'cancelled'] %}
+                            {% if team.format == 'Team' %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-4">
+                                        <h6>Team Password</h6>
+                                        <p class="text-muted small">Control access to your team by setting or changing the password.</p>
+                                        <form id="password-form" class="mb-2">
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="team_password"
+                                                       placeholder="{% if team.password %}Enter new password{% else %}Set team password{% endif %}"
+                                                       >
+                                                <button class="btn btn-outline-primary" type="submit">
+                                                    <ion-icon name="key-outline" class="me-1"></ion-icon>
+                                                    {% if team.password %}Update{% else %}Set{% endif %}
+                                                </button>
+                                            </div>
+                                        </form>
+                                        {% if team.password %}
+                                        <button type="button" class="btn btn-link px-0 text-secondary" onclick="removePassword()">
+                                            <small><ion-icon name="lock-open-outline" class="me-1"></ion-icon>Remove Password</small>
                                         </button>
+                                        {% endif %}
                                     </div>
-                                    {% if team.password %}
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removePassword()">
-                                        <ion-icon name="lock-open-outline" class="me-1"></ion-icon>
-                                        Remove Password
-                                    </button>
+                                        {% if team.format == 'Team' and team.status in ['complete', 'closed'] %}
+                                    <div class="mt-3">
+                                        <h6>Team Registration</h6>
+                                        {% if team.status == 'closed' %}
+                                        <p class="text-muted small">Your team is closed to new registrations. Click to reopen.</p>
+                                        <button class="btn btn-outline-success" onclick="reopenTeam('{{ team.name }}', '{{ team.id }}')">
+                                            <ion-icon name="lock-open-outline" class="me-1"></ion-icon>
+                                            Reopen Team
+                                        </button>
+                                        {% else %}
+                                        <p class="text-muted small">Close your team to prevent new members from joining.</p>
+                                        <button class="btn btn-outline-secondary" onclick="closeTeam('{{ team.name }}', '{{ team.id }}')">
+                                            <ion-icon name="lock-closed-outline" class="me-1"></ion-icon>
+                                            Close Team
+                                        </button>
+                                        {% endif %}
+                                    </div>
                                     {% endif %}
-                                </form>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <h6>Invite Members</h6>
+                                        <p class="text-muted small">Share this unique link to allow others to join your team directly, bypassing the team list and password.</p>
+                                        <div id="invite-alert-container"></div>
+                                        <div class="input-group mb-2">
+                                            <input type="text" class="form-control" id="inviteLink"
+                                                   value="{% if team.invite_token %}{{ url_for('join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly>
+                                            <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token %}disabled{% endif %}>
+                                                <ion-icon name="copy-outline"></ion-icon> Copy
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()">
+                                            <ion-icon name="sparkles-outline"></ion-icon> {% if team.invite_token %}Regenerate Link{% else %}Generate Link{% endif %}
+                                        </button>
+                                        <small class="text-muted d-block mt-2">Regenerating the link will invalidate the old one.</small>
+                                    </div>
+
+
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <h6>Team Management</h6>
+                            <hr>
+                            {% endif %}
+                            <div class="row">
+                                <div class="col-12">
+                                    <h6>Update Details</h6>
+                                    <p class="text-muted small">Update your entry's time estimate and comments.</p>
+                                    <form id="update-details-form">
+                                        <div class="mb-3">
+                                            <label for="estimated_duration_input" class="form-label">Estimated Duration</label>
+                                            <input type="text" class="form-control" id="estimated_duration_input"
+                                                   placeholder="HH:MM" value="{{ team.estimated_duration }}" required pattern="^\d{1,2}:\d{2}$" title="Format: HH:MM">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="comments_input" class="form-label">Comments</label>
+                                            <textarea class="form-control" id="comments_input" rows="3"
+                                                      placeholder="Optional comments about your {% if team.format == 'Solo' %}entry{% else %}team entry{% endif %}..."
+                                                      maxlength="500">{{ team.comments or '' }}</textarea>
+                                            <div class="form-text">Optional comments visible to the admin</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="has_baton_input" name="has_baton" value="true" {% if team.has_baton %}checked{% endif %} {% if team.status != 'pending' %}disabled{% endif %}>
+                                                <label class="form-check-label" for="has_baton_input">
+                                                    <ion-icon name="flag-outline" class="me-1"></ion-icon>
+                                                    I will bring a Light Rail Relay baton from a previous year.
+                                                </label>
+                                                {% if team.status != 'pending' %}
+                                                <div class="form-text">This setting can only be changed while the team registration is pending.</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <button class="btn btn-primary" type="submit">
+                                                <ion-icon name="save-outline" class="me-1"></ion-icon> Save Changes
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            <hr>
+                        {% endif %}
+                        <div class="row">
+                            <div class="col-12">
+                                <h6>Entry Management</h6>
                                 {% if team.status == 'withdrawn' %}
-                                <p class="text-muted small">Your team has been withdrawn. Click to re-enter the event.</p>
-                                <button class="btn btn-outline-success" onclick="unwithdrawTeam('{{ team.name }}', '{{ team.short_id }}')">
-                                    <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>
-                                    Un-withdraw Team
-                                </button>
+                                <p class="text-muted small">Your {% if team.format == 'Solo' %}entry has{% else %}team has{% endif %} been withdrawn. Click to re-enter the event.</p>
+                                <div class="text-end">
+                                    <button class="btn btn-outline-success" onclick="unwithdrawTeam('{{ team.name }}', '{{ team.id }}')">
+                                        <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>
+                                        Un-withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                    </button>
+                                </div>
+                                {% elif team.status == 'pending' %}
+                                <p class="text-muted small">Cancel your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} registration if you no longer wish to participate.</p>
+                                <div class="text-end">
+                                    <button class="btn btn-outline-danger" onclick="cancelTeam('{{ team.name }}', '{{ team.id }}')">
+                                        <ion-icon name="close-circle-outline" class="me-1"></ion-icon>
+                                        Cancel {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                    </button>
+                                </div>
                                 {% else %}
-                                <p class="text-muted small">Withdraw your team from the event if needed.</p>
-                                <button class="btn btn-outline-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.short_id }}')">
-                                    <ion-icon name="exit-outline" class="me-1"></ion-icon>
-                                    Withdraw Team
-                                </button>
+                                <p class="text-muted small">Withdraw your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} from the event if needed.</p>
+                                <div class="text-end">
+                                    <button class="btn btn-outline-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
+                                        <ion-icon name="exit-outline" class="me-1"></ion-icon>
+                                        Withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                    </button>
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
@@ -341,246 +461,279 @@
             </div>
         </div>
         {% endif %}
-
-        <!-- Captain Invite Modal -->
-        {% if current_user.is_captain_of(team) %}
-        <div class="modal fade" id="inviteModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Invite Team Members</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Share this link with potential team members:</p>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="joinLink"
-                                   value="{{ request.url_root }}{{ url_for('join_team')[1:] }}" readonly>
-                            <button class="btn btn-outline-secondary" type="button" onclick="copyLink()">
-                                <ion-icon name="copy-outline"></ion-icon> Copy
-                            </button>
-                        </div>
-                        <small class="text-muted">Members can select your team "{{ team.name }}" from the join page.</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     <script type="module">
-        function copyLink() {
-            const linkInput = document.getElementById('joinLink');
-            linkInput.select();
-            document.execCommand('copy');
+        import { membershipAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
-            const button = event.target.closest('button');
-            const originalText = button.innerHTML;
-            button.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon> Copied!';
-            button.classList.remove('btn-outline-secondary');
-            button.classList.add('btn-success');
-
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.classList.remove('btn-success');
-                button.classList.add('btn-outline-secondary');
-            }, 2000);
-        }
-
-        window.withdrawMembership = function(membershipId) {
+        // Membership management functions
+        window.withdrawMembership = async function(membershipId) {
             if (!confirm('Are you sure you want to withdraw from this team? This action will mark your registration as withdrawn.')) {
                 return;
             }
 
-            fetch(`{{ url_for('withdraw_membership', short_id=team.short_id, membership_id='999999') }}`.replace('999999', `${membershipId}`), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Failed to withdraw membership');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while withdrawing membership');
-            });
-        };
+            const result = await membershipAPI.withdrawMembership('{{ team.id }}', membershipId);
 
-        window.transferCaptaincy = function(shortId, newCaptainId, newCaptainName) {
-            if (!confirm(`Are you sure you want to transfer team captaincy to ${newCaptainName}? You will no longer be the captain of this team.`)) {
-                return;
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to withdraw membership');
             }
-
-            fetch(`{{ url_for('transfer_captain', short_id='TEMP_SHORT_ID', new_captain_id=999) }}`.replace('TEMP_SHORT_ID', shortId).replace('999', newCaptainId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Failed to transfer captaincy');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while transferring captaincy');
-            });
         };
 
-        window.removeMember = function(membershipId, memberName) {
+        window.removeMember = async function(membershipId, memberName) {
             if (!confirm(`Are you sure you want to remove ${memberName} from the team? This action will mark their membership as removed.`)) {
                 return;
             }
 
-            fetch(`{{ url_for('remove_member', short_id=team.short_id, membership_id='999999') }}`.replace('999999', `${membershipId}`), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Failed to remove member');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while removing member');
-            });
+            const result = await membershipAPI.removeMember('{{ team.id }}', membershipId);
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to remove member');
+            }
         };
 
-        // Handle password form submission
-        document.getElementById('password-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const passwordInput = document.getElementById('team_password');
-            const password = passwordInput.value.trim();
-
-            if (!password) {
-                alert('Please enter a password');
+        window.transferCaptaincy = async function(shortId, newCaptainId, newCaptainName) {
+            if (!confirm(`Are you sure you want to transfer team captaincy to ${newCaptainName}? You will no longer be the captain of this team.`)) {
                 return;
             }
 
-            updateTeamPassword(password);
-        });
+            const result = await membershipAPI.promoteToCaptain(shortId, newCaptainId);
 
-        window.updateTeamPassword = function(password) {
-            fetch(`{{ url_for('manage_team_password', short_id=team.short_id) }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ password: password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Failed to update password');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while updating password');
-            });
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to transfer captaincy');
+            }
         };
 
-        window.removePassword = function() {
+        // Invite link management
+        window.copyInviteLink = async function() {
+            const linkInput = document.getElementById('inviteLink');
+            const success = await Utils.copyToClipboard(linkInput.value);
+
+            if (success) {
+                const button = document.getElementById('copyInviteLinkBtn');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon> Copied!';
+                button.classList.remove('btn-outline-secondary');
+                button.classList.add('btn-success');
+
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-secondary');
+                }, 2000);
+            }
+        }
+
+        window.generateInviteLink = async function() {
+            const generateBtn = document.getElementById('generateInviteLinkBtn');
+            const alertContainer = document.getElementById('invite-alert-container');
+            const originalBtnHTML = generateBtn.innerHTML;
+
+            api.setButtonLoading(generateBtn, 'Generating...');
+            api.clearAlerts(alertContainer);
+
+            const response = await fetch(`{{ url_for('generate_invite_link', team_id=team.id) }}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                const linkInput = document.getElementById('inviteLink');
+                const copyBtn = document.getElementById('copyInviteLinkBtn');
+                linkInput.value = data.invite_link;
+                copyBtn.disabled = false;
+                generateBtn.innerHTML = '<ion-icon name="sparkles-outline"></ion-icon> Regenerate Link';
+
+                api.showAlert(alertContainer, 'success', data.message);
+            } else {
+                api.showAlert(alertContainer, 'danger', data.error || 'Failed to generate link');
+                api.resetButton(generateBtn);
+            }
+        }
+
+        // Team password management
+        window.updateTeamPassword = async function(password) {
+            const result = await api.request(`{{ url_for('manage_team_password', team_id=team.id) }}`, {
+                method: 'POST',
+                body: JSON.stringify({ password: password })
+            });
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to update password');
+            }
+        };
+
+        window.removePassword = async function() {
             if (!confirm('Are you sure you want to remove the team password? This will allow anyone to join your team without a password.')) {
                 return;
             }
 
-            fetch(`{{ url_for('manage_team_password', short_id=team.short_id) }}`, {
+            const result = await api.request(`{{ url_for('manage_team_password', team_id=team.id) }}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({ password: null })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.reload();
-                } else {
-                    alert(data.error || 'Failed to remove password');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while removing password');
             });
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to remove password');
+            }
         };
 
-        window.withdrawTeam = function (teamName, shortId) {
+        // Team management functions
+        window.withdrawTeam = async function(teamName, shortId) {
             if (!confirm(`Are you sure you want to withdraw team "${teamName}" from the event?`)) {
                 return;
             }
 
-            fetch(`{{ url_for('withdraw_team', short_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    window.location.href = '{{ url_for("index") }}';
-                } else {
-                    alert(data.error || 'Failed to withdraw team');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while withdrawing team');
-            });
-        }
+            const result = await teamAPI.withdrawTeam(shortId);
 
-        window.unwithdrawTeam = function (teamName, shortId) {
+            if (result.success) {
+                alert(result.data.message);
+                window.location.href = '{{ url_for("index") }}';
+            } else {
+                alert(result.error || 'Failed to withdraw team');
+            }
+        };
+
+        window.unwithdrawTeam = async function(teamName, shortId) {
             if (!confirm(`Are you sure you want to un-withdraw team "${teamName}" and re-enter the event?`)) {
                 return;
             }
 
-            fetch(`{{ url_for('unwithdraw_team', short_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
+            const result = await teamAPI.unwithdrawTeam(shortId);
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to un-withdraw team');
+            }
+        };
+
+        // Custom team operations (extend TeamAPI as needed)
+        window.cancelTeam = async function(teamName, shortId) {
+            if (!confirm(`Are you sure you want to cancel team "${teamName}"? This action is permanent and cannot be undone.`)) {
+                return;
+            }
+
+            const result = await api.request(`{{ url_for('cancel_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
+                method: 'POST'
+            });
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.href = '{{ url_for("index") }}';
+            } else {
+                alert(result.error || 'Failed to cancel team');
+            }
+        };
+
+        window.closeTeam = async function(teamName, shortId) {
+            if (!confirm(`Are you sure you want to close team "${teamName}" to new registrations?`)) {
+                return;
+            }
+
+            const result = await api.request(`{{ url_for('close_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
+                method: 'POST'
+            });
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to close team');
+            }
+        };
+
+        window.reopenTeam = async function(teamName, shortId) {
+            if (!confirm(`Are you sure you want to reopen team "${teamName}" for new registrations?`)) {
+                return;
+            }
+
+            const result = await api.request(`{{ url_for('reopen_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
+                method: 'POST'
+            });
+
+            if (result.success) {
+                alert(result.data.message);
+                window.location.reload();
+            } else {
+                alert(result.error || 'Failed to reopen team');
+            }
+        };
+
+        // Form submission handlers
+        const passwordForm = document.getElementById('password-form');
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const passwordInput = document.getElementById('team_password');
+                const password = passwordInput.value.trim();
+
+                if (!password) {
+                    alert('Please enter a password');
+                    return;
+                }
+
+                updateTeamPassword(password);
+            });
+        }
+
+        // Team details update form
+        const updateDetailsForm = document.getElementById('update-details-form');
+        if (updateDetailsForm) {
+            updateDetailsForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const estimatedDurationInput = document.getElementById('estimated_duration_input');
+                const estimatedDuration = estimatedDurationInput.value.trim();
+                const commentsInput = document.getElementById('comments_input');
+                const comments = commentsInput.value.trim();
+                const hasBatonInput = document.getElementById('has_baton_input');
+                const hasBaton = hasBatonInput.checked;
+
+                if (!estimatedDuration) {
+                    alert('Please enter an estimated duration.');
+                    return;
+                }
+
+                // Basic regex validation for HH:MM using shared utility
+                if (!Utils.validateTime(estimatedDuration)) {
+                    alert('Estimated duration must be in HH:MM format (e.g., 05:30 or 12:00).');
+                    return;
+                }
+
+                const result = await teamAPI.updateTeam('{{ team.id }}', {
+                    estimated_duration: estimatedDuration,
+                    comments: comments,
+                    has_baton: hasBaton
+                });
+
+                if (result.success) {
+                    alert(result.data.message);
                     window.location.reload();
                 } else {
-                    alert(data.error || 'Failed to un-withdraw team');
+                    alert(result.error || 'Failed to update team details');
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while un-withdrawing team');
             });
         }
     </script>
+    {% include '_footer.html' %}
 </body>
 </html>

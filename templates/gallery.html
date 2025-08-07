@@ -10,20 +10,28 @@
 
 <div class="container mt-4 mb-4">
   {% include '_navbar.html' %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1>{{ team.name }}</h1>
-</div>
+
 
 {% if team.status == 'pending' %}
 <div class="alert alert-warning" role="alert">
-  <ion-icon name="time-outline" class="me-2"></ion-icon>
-  <strong>Team Registration Pending Approval</strong><br>
-  Your team registration is awaiting admin approval. Until approved:
-  <ul class="mb-0 mt-2">
-    <li>Other users cannot join this team</li>
-    <li>The team will not appear in the public team list</li>
-  </ul>
-  <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
+    <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
+    {% if team.format == 'Solo' %}
+        <strong>Solo Entry Pending Approval</strong><br>
+        Your solo registration is awaiting admin approval.
+        <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
+        {% if not team.has_baton %}
+        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
+        {% endif %}
+    {% else %}
+        <strong>Team Registration Pending Approval</strong><br>
+        Your team registration is awaiting admin approval. Until approved:
+        <ul class="mb-0 mt-2">
+            <li>Other users cannot join this team</li>
+            <li>The team will not appear in the public team list</li>
+            <li>Photo uploads are disabled</li>
+        </ul>
+        <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
+    {% endif %}
 </div>
 {% elif team.status == 'withdrawn' %}
 <div class="alert alert-secondary" role="alert">
@@ -31,8 +39,12 @@
   <strong>Team Status: Withdrawn</strong> - This team has been withdrawn from the event.
 </div>
 {% endif %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>{{ team.name }}</h1>
+</div>
 
-{% if current_user.is_authenticated and (current_user.is_admin or team.captain_id == current_user.id or current_user.memberships.filter_by(team_id=team.id).first()) %}
+
+{% if permissions.can_access_team(current_user, team) %}
 <div class="alert alert-info" role="alert">
   <ion-icon name="link-outline" class="me-2"></ion-icon>
   <strong>Public View Link:</strong> Share this link for view-only access to your gallery:<br>
@@ -45,18 +57,8 @@
 </div>
 {% endif %}
 
-{% if current_user.is_authenticated and team.status not in ['pending', 'withdrawn'] %}
-  {% set can_upload = false %}
-  {% if current_user.is_admin or team.captain_id == current_user.id %}
-    {% set can_upload = true %}
-  {% else %}
-    {% for membership in current_user.memberships if membership.team_id == team.id and membership.status == 'active' %}
-      {% set can_upload = true %}
-    {% endfor %}
-  {% endif %}
-
-  {% if can_upload %}
-<form action="/team/{{ short_id }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
+{% if permissions.can_upload_to_team(current_user, team) %}
+<form action="/team/{{ team_id }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
   <div class="row mt-3 mb-3 align-items-center">
     <label for="fileInput" class="col-sm-2 col-form-label">Upload Photos:</label>
     <div class="col-sm-10">
@@ -68,7 +70,6 @@
   </div>
   <div id="imagePreviewContainer" class="row mb-3 p-4 border border-primary text-bg-light" style="display: none"></div>
 </form>
-  {% endif %}
 {% endif %}
 
 <div class="row">
@@ -79,14 +80,14 @@
         <div class="spinner-border text-secondary opacity-50" role="status"><span class="visually-hidden">Loading...</span>
           </div>
       </div>
-        <img src="/uploads/{{ short_id }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <img src="/uploads/{{ team_id }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
         <div class="card-body">
           <h5 class="card-title">{{ image }}</h5>
           <p class="card-text">
             <strong>Capture Time:</strong> {{ capture_time if capture_time else 'None' }}<br>
             <strong>GPS Coordinates:</strong> {% if gps_coordinates %}<a href="https://www.google.com/maps?q={{ gps_coordinates[0]|round(6) }},{{ gps_coordinates[1]|round(6) }}" target="_blank">({{ gps_coordinates[0]|round(6) }}, {{ gps_coordinates[1]|round(6) }})</a>{% else %}None{% endif %}
           </p>
-          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ short_id }}">Delete</button>
+          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ team_id }}">Delete</button>
         </div>
       </div>
     </div>
@@ -188,27 +189,23 @@ imagesWithCoordinates.forEach(({ image, lat, lng }) => {
     new maplibregl.Marker(el)
         .setLngLat([lng, lat])
         .setPopup(new maplibregl.Popup({ offset: 25 }) // Add popups
-            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ short_id }}/${image}" style="width: 100px; height: auto;">`))
+            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ team_id }}/${image}" style="width: 100px; height: auto;">`))
         .addTo(map);
 });
+
+// Import shared API client
+import { imageAPI, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
 document.querySelectorAll('.delete-button').forEach(button => {
   button.addEventListener('click', async function() {
     const filename = this.getAttribute('data-filename');
-    const teamHash = this.getAttribute('data-hash');
     if (confirm(`Are you sure you want to delete ${filename}?`)) {
-      try {
-        const response = await fetch(`{{ url_for('delete_image', short_id='') }}${teamHash}?filename=${filename}`, {
-          method: 'DELETE'
-        });
-        if (response.ok) {
-          this.closest('.col-md-3').remove();  // Remove the card from the UI
-        } else {
-          alert('Failed to delete the file.');
-        }
-      } catch (err) {
-        console.error('Error deleting image:', err);
-        alert('An error occurred while deleting the file.');
+      const result = await imageAPI.deleteImage(filename);
+
+      if (result.success) {
+        this.closest('.col-md-3').remove();  // Remove the card from the UI
+      } else {
+        alert(result.error || 'Failed to delete the file.');
       }
     }
   });
@@ -289,25 +286,29 @@ fileInput.addEventListener('change', async function(event) {
 });
 }
 
-// Function to copy public link
-window.copyPublicLink = function() {
+// Function to copy public link using shared utility
+window.copyPublicLink = async function() {
   const linkInput = document.getElementById('publicLink');
-  linkInput.select();
-  document.execCommand('copy');
+  const success = await Utils.copyToClipboard(linkInput.value);
 
-  const button = event.target.closest('button');
-  const originalText = button.innerHTML;
-  button.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon> Copied!';
-  button.classList.remove('btn-outline-secondary');
-  button.classList.add('btn-success');
+  if (success) {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon> Copied!';
+    button.classList.remove('btn-outline-secondary');
+    button.classList.add('btn-success');
 
-  setTimeout(() => {
-    button.innerHTML = originalText;
-    button.classList.remove('btn-success');
-    button.classList.add('btn-outline-secondary');
-  }, 2000);
+    setTimeout(() => {
+      button.innerHTML = originalText;
+      button.classList.remove('btn-success');
+      button.classList.add('btn-outline-secondary');
+    }, 2000);
+  } else {
+    alert('Failed to copy link to clipboard');
+  }
 };
 
 </script>
+{% include '_footer.html' %}
 </body>
 </html>

@@ -50,35 +50,60 @@
 <script type="module">
 // Global Bootstrap initialization for all pages
 import 'bootstrap';
-</script>
 
+// Import and initialize shared API client
+import { userAPI, configureUrls } from '{{ url_for("static", filename="js/api-client.js") }}';
 
-<script type="module">
-// Global account deletion function
-window.confirmDeleteAccount = function() {
+// Configure all URLs using Flask's url_for - done once for entire application
+configureUrls({
+    // Team management
+    createTeam: '{{ url_for("create_team") }}',
+    joinTeam: '{{ url_for("join_team") }}',
+    myRegistration: '{{ url_for("my_registration") }}',
+    withdrawTeam: '{{ url_for("withdraw_team", team_id="__TEAM_ID__") }}',
+    unwithdrawTeam: '{{ url_for("unwithdraw_team", team_id="__TEAM_ID__") }}',
+    deleteTeam: '{{ url_for("delete_team", team_id="__TEAM_ID__") }}',
+    updateTeam: '{{ url_for("update_team_details", team_id="__TEAM_ID__") }}',
+    
+    // Membership management
+    withdrawMembership: '{{ url_for("withdraw_membership", team_id="__TEAM_ID__", membership_id="__MEMBERSHIP_ID__") }}',
+    unwithdrawMembership: '{{ url_for("unwithdraw_membership", team_id="__TEAM_ID__", membership_id="__MEMBERSHIP_ID__") }}',
+    removeMember: '{{ url_for("remove_member", team_id="__TEAM_ID__", membership_id="__MEMBERSHIP_ID__") }}',
+    promoteToCaptain: '{{ url_for("transfer_captain", team_id="__TEAM_ID__", new_captain_id="__MEMBERSHIP_ID__") }}',
+    
+    // User management
+    deleteAccount: '{{ url_for("delete_account") }}',
+    deleteUser: '{{ url_for("delete_user", user_id="__USER_ID__") }}',
+    updatePreferences: '{{ url_for("my_registration") }}',
+    
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    // Admin routes
+    approveTeam: '{{ url_for("approve_team", team_id="__TEAM_ID__") }}',
+    cancelTeam: '{{ url_for("cancel_team", team_id="__TEAM_ID__") }}',
+    closeTeam: '{{ url_for("close_team", team_id="__TEAM_ID__") }}',
+    reopenTeam: '{{ url_for("reopen_team", team_id="__TEAM_ID__") }}',
+    admin: '{{ url_for("admin") }}',
+    {% endif %}
+    
+    // Other routes
+    index: '{{ url_for("index") }}',
+    login: '{{ url_for("login") }}'
+});
+
+// Global account deletion function using shared API client
+window.confirmDeleteAccount = async function() {
     if (!confirm('Are you sure you want to delete your account? This will permanently remove all your data including team registrations. This action cannot be undone.')) {
         return;
     }
 
-    fetch('/delete-account', {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            window.location.href = '/';
-        } else {
-            alert(data.error || 'Failed to delete account');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting your account');
-    });
+    const result = await userAPI.deleteAccount();
+    
+    if (result.success) {
+        alert(result.data.message);
+        window.location.href = '{{ url_for("index") }}';
+    } else {
+        alert(result.error || 'Failed to delete account');
+    }
 };
 </script>
 

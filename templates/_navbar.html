@@ -11,35 +11,8 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
             {% if current_user.is_authenticated %}
-                {% set user_membership = current_user.memberships | first if current_user.memberships else none %}
+                {% set user_membership = current_user.memberships | selectattr('status', 'equalto', 'active') | first if current_user.memberships else none %}
                 {% set user_team = user_membership.team if user_membership else current_user.captained_teams | first if current_user.captained_teams else none %}
-
-                <!-- Left side: Admin and non-team links -->
-                <ul class="navbar-nav">
-                    {% if not user_team %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'create_team' %}active{% endif %}" href="{{ url_for('create_team') }}">
-                                <ion-icon name="add-circle-outline" class="me-1"></ion-icon>
-                                Create Team
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'join_team' %}active{% endif %}" href="{{ url_for('join_team') }}">
-                                <ion-icon name="person-add-outline" class="me-1"></ion-icon>
-                                Join Team
-                            </a>
-                        </li>
-                    {% endif %}
-
-                    {% if current_user.is_admin %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}" href="{{ url_for('admin') }}">
-                                <ion-icon name="settings-outline" class="me-1"></ion-icon>
-                                Admin Panel
-                            </a>
-                        </li>
-                    {% endif %}
-                </ul>
 
                 <!-- Center: Team section (double-decker on md+) -->
                 {% if user_team %}
@@ -52,22 +25,56 @@
 
                         <!-- Team links -->
                         <div class="d-flex flex-column flex-md-row align-items-center justify-content-center gap-1 gap-md-3">
-                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'team_members' %}active fw-bold{% endif %}" href="{{ url_for('team_members', short_id=user_team.short_id) }}">
-                                <ion-icon name="people-outline" class="me-1"></ion-icon>
-                                <span class="d-md-none">{{ user_team.name }} - </span>Members
+                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'team_members' %}active fw-bold{% endif %}" href="{{ url_for('team_members', team_id=user_team.id) }}">
+                                {% if user_team.format == 'Solo' %}
+                                    <ion-icon name="{% if request.endpoint == 'team_members' %}person{% else %}person-outline{% endif %}" class="me-1"></ion-icon>
+                                    <span class="d-md-none">{{ user_team.name }} - </span>My Entry
+                                {% else %}
+                                    <ion-icon name="{% if request.endpoint == 'team_members' %}people{% else %}people-outline{% endif %}" class="me-1"></ion-icon>
+                                    <span class="d-md-none">{{ user_team.name }} - </span>Members
+                                {% endif %}
                             </a>
-                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'team_page' %}active fw-bold{% endif %}" href="{{ url_for('team_page', short_id=user_team.short_id) }}">
-                                <ion-icon name="images-outline" class="me-1"></ion-icon>
+                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'team_page' %}active fw-bold{% endif %}" href="{{ url_for('team_page', team_id=user_team.id) }}">
+                                <ion-icon name="{% if request.endpoint == 'team_page' %}images{% else %}images-outline{% endif %}" class="me-1"></ion-icon>
                                 Photos
-                            </a>
-                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'my_registration' %}active fw-bold{% endif %}" href="{{ url_for('my_registration') }}">
-                                <ion-icon name="person-outline" class="me-1"></ion-icon>
-                                My Registration
                             </a>
                         </div>
                     </div>
                 </div>
                 {% endif %}
+
+              <ul class="navbar-nav m-auto">
+                    {% if not user_team %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'create_team' %}active{% endif %}" href="{{ url_for('create_team') }}">
+                                <ion-icon name="{% if request.endpoint == 'create_team' %}add-circle{% else %}add-circle-outline{% endif %}" class="me-1"></ion-icon>
+                                Create Team
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'join_team' %}active{% endif %}" href="{{ url_for('join_team') }}">
+                                <ion-icon name="{% if request.endpoint == 'join_team' %}person-add{% else %}person-add-outline{% endif %}" class="me-1"></ion-icon>
+                                Join Team
+                            </a>
+                        </li>
+                    {% elif user_team.format == 'Team' %}
+                        <li class="nav-item">
+                            <a class="nav-link d-flex align-items-center {% if request.endpoint == 'my_registration' %}active fw-bold{% endif %}" href="{{ url_for('my_registration') }}">
+                                <ion-icon name="{% if request.endpoint == 'my_registration' %}person{% else %}person-outline{% endif %}" class="me-1"></ion-icon>
+                                My Registration
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% if current_user.is_admin %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'admin' %}active{% endif %}" href="{{ url_for('admin') }}">
+                                <ion-icon name="{% if request.endpoint == 'admin' %}settings{% else %}settings-outline{% endif %}" class="me-1"></ion-icon>
+                                Admin
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
 
                 <!-- Right side: User dropdown -->
                 <div class="navbar-nav">

@@ -5,10 +5,12 @@ services:
   relay-photo-collector:
     volumes:
       - "./app.py:/app/app.py"
+      - "./permissions.py:/app/permissions.py"
       - "./models.py:/app/models.py"
       - "./templates:/app/templates"
       - "./scripts:/app/scripts"
       - "./requirements.txt:/app/requirements.txt"
+      - "./static:/app/static"
     ports:
       - "5001:5001"
     environment:

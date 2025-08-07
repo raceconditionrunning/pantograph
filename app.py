@@ -3,9 +3,9 @@ import hashlib
 import hmac
 import time
 import datetime
+import secrets
 import json
-import random
-import string
+import logging
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from flask import Flask, request, redirect, render_template, send_from_directory, jsonify, abort, session, url_for
@@ -14,6 +14,11 @@ from authlib.integrations.flask_client import OAuth
 from pillow_heif import register_heif_opener
 from werkzeug.utils import secure_filename
 from models import db, User, Team, TeamMembership
+from permissions import (
+    admin_required, team_access_required, team_captain_required,
+    team_captain_or_member_required, user_self_or_admin_required,
+    team_upload_allowed, register_permissions
+)
 
 # Register HEIC/AVIF opener for Pillow
 register_heif_opener()
@@ -71,6 +76,7 @@ ADMIN_EMAIL = get_secret('ADMIN_EMAIL')
 
 # Initialize extensions
 db.init_app(app)
+register_permissions(app)
 
 # Make utility functions available in templates
 @app.template_global()
@@ -87,7 +93,7 @@ login_manager.login_message = 'Please log in to access this page.'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    return db.session.get(User, user_id)
 
 # Setup OAuth
 oauth = OAuth(app)
@@ -138,22 +144,6 @@ def get_team_hash(team_name):
     return hmac_value
 
 
-def generate_short_id(length=8):
-    """Generate short random ID like 'k3x9p2m7'"""
-    chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    while True:
-        short_id = ''.join(random.choice(chars) for _ in range(length))
-        if not Team.query.filter_by(short_id=short_id).first():
-            return short_id
-
-
-def generate_gallery_hash(length=8):
-    """Generate separate public gallery hash"""
-    chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    while True:
-        gallery_hash = ''.join(random.choice(chars) for _ in range(length))
-        if not Team.query.filter_by(gallery_hash=gallery_hash).first():
-            return gallery_hash
 
 
 def load_station_names():
@@ -228,10 +218,16 @@ def oauth_login(provider):
         return abort(404)
 
     client = oauth.create_client(provider)
-    # Pass the next parameter through the OAuth flow
-    next_page = request.args.get('next')
-    redirect_uri = url_for('oauth_callback', provider=provider, next=next_page, _external=True)
+
+    # Store the 'next' parameter in the session
+    next_url = request.args.get('next')
+    if next_url:
+        session['next_url'] = next_url
+    logging.warning(f"DEBUG: Storing next_url in session: {session.get('next_url')}")
+
+    redirect_uri = url_for('oauth_callback', provider=provider, _external=True)
     return client.authorize_redirect(redirect_uri)
+
 
 @app.route('/account/auth/<provider>')
 def oauth_callback(provider):
@@ -307,10 +303,18 @@ def oauth_callback(provider):
         db.session.commit()
         login_user(user)
 
-        # Redirect to the original page or index if no next parameter
-        next_page = request.args.get('next')
+        # Redirect to the original page from session or to index
+        next_page = session.pop('next_url', None)
+        logging.warning(f"DEBUG: Retrieved next_url from session: {next_page}")
+
         if not next_page or not next_page.startswith('/'):
+            if not next_page:
+                logging.warning("DEBUG: next_page is None, redirecting to index.")
+            else:
+                logging.warning(f"DEBUG: next_page '{next_page}' is not a valid relative path, redirecting to index.")
             next_page = url_for('index')
+
+        logging.warning(f"DEBUG: Redirecting to: {next_page}")
         return redirect(next_page)
 
     except Exception as e:
@@ -331,9 +335,9 @@ def find_team_by_hash(team_hash):
     return None
 
 
-def find_team_by_short_id(short_id):
-    """Find team in database by short_id"""
-    return Team.query.filter_by(short_id=short_id).first()
+def find_team_by_id(team_id):
+    """Find team in database by id"""
+    return Team.query.filter_by(id=team_id).first()
 
 
 def find_team_by_gallery_hash(gallery_hash):
@@ -341,20 +345,11 @@ def find_team_by_gallery_hash(gallery_hash):
     return Team.query.filter_by(gallery_hash=gallery_hash).first()
 
 
-# New team management route using short_id
-@app.route('/team/<short_id>/gallery')
-def team_page(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
+@app.route('/team/<team_id>/gallery')
+@team_access_required()
+def team_page(team_id, team):
 
-    if not team:
-        return "Invalid team URL.", 404
-
-    # Check access permissions
-    if not check_team_access(team):
-        abort(403)
-
-    team_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+    team_path = os.path.join(UPLOAD_FOLDER, team.id)
 
     # Check if team folder exists and get images
     images = []
@@ -376,7 +371,7 @@ def team_page(short_id):
 
     # Sort by capture_time, defaulting to datetime.min for missing values
     image_data = sorted(image_data, key=lambda x: parse_capture_time(x[1]) or datetime.min)
-    return render_template('gallery.html', team=team, images=image_data, short_id=short_id)
+    return render_template('gallery.html', team=team, images=image_data, team_id=team_id)
 
 
 # Public gallery route (view-only)
@@ -388,7 +383,7 @@ def public_gallery(gallery_hash):
     if not team:
         return "Invalid gallery URL.", 404
 
-    team_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+    team_path = os.path.join(UPLOAD_FOLDER, team.id)
 
     # Check if team folder exists and get images
     images = []
@@ -413,40 +408,13 @@ def public_gallery(gallery_hash):
     return render_template('gallery.html', team=team, images=image_data, gallery_hash=gallery_hash)
 
 
-def check_team_access(team):
-    """Check if current user has access to team (member, captain, or admin)"""
-    if not current_user.is_authenticated:
-        return False
-
-    # Admin has access to all teams
-    if current_user.is_admin:
-        return True
-
-    # Captain has access to their own team
-    if team.captain_id == current_user.id:
-        return True
-
-    # Team members have access
-    membership = TeamMembership.query.filter_by(user_id=current_user.id, team_id=team.id).first()
-    return membership is not None
-
-
-@app.route('/team/<short_id>/members')
-@login_required
-def team_members(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
-
-    if not team:
-        return "Invalid team URL.", 404
-
-    # Check access permissions
-    if not check_team_access(team):
-        abort(403)
+@app.route('/team/<team_id>/members')
+@team_access_required()
+def team_members(team_id, team):
 
     # Get all team memberships with user data
     all_memberships = TeamMembership.query.filter_by(team_id=team.id).all()
-    
+
     # Filter memberships by status
     active_members = [m for m in all_memberships if m.status == 'active']
     withdrawn_members = [m for m in all_memberships if m.status == 'withdrawn']
@@ -462,24 +430,20 @@ def team_members(short_id):
                          active_members=active_members,
                          withdrawn_members=withdrawn_members,
                          removed_members=removed_members,
-                         short_id=short_id,
+                         team_id=team_id,
                          willing_leaders_count=willing_leaders_count,
                          avg_preferred_miles=avg_preferred_miles)
 
 
-@app.route('/team/<short_id>/delete', methods=['DELETE'])
-def delete_image(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
-
-    if not team:
-        return jsonify({"error": "Invalid team URL"}), 404
+@app.route('/team/<team_id>/gallery/delete', methods=['DELETE'])
+@team_upload_allowed()
+def delete_image(team_id, team):
 
     filename = secure_filename(request.args.get('filename'))
     if not filename:
         return jsonify({"error": "No filename provided"}), 400
 
-    file_path = os.path.join(UPLOAD_FOLDER, team.short_id, filename)
+    file_path = os.path.join(UPLOAD_FOLDER, team.id, filename)
     if os.path.exists(file_path):
         os.remove(file_path)
         return jsonify({"success": True}), 200
@@ -488,34 +452,12 @@ def delete_image(short_id):
 
 
 
-@app.route('/team/<short_id>/upload', methods=['POST'])
-@login_required
-def upload_file(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
+@app.route('/team/<team_id>/upload', methods=['POST'])
+@team_upload_allowed()
+def upload_file(team_id, team):
+    # team is automatically provided by the decorator
 
-    if not team:
-        return "Invalid team URL.", 404
-
-    # Check if team is in pending status
-    if team.status == 'pending':
-        return "Photo uploads are not allowed for pending teams. Please wait for admin approval.", 403
-
-    # Check if team has been withdrawn
-    if team.status == 'withdrawn':
-        return "Photo uploads are not allowed for withdrawn teams.", 403
-
-    # Check if current user has access to this team
-    if not check_team_access(team):
-        return "You do not have permission to upload photos for this team.", 403
-
-    # Check if current user is removed from this team
-    if current_user.id != team.captain_id:  # Captain is never "removed"
-        membership = TeamMembership.query.filter_by(user_id=current_user.id, team_id=team.id).first()
-        if not membership or membership.status in ['removed', 'withdrawn']:
-            return "You cannot upload photos because you have been removed from this team or have withdrawn.", 403
-
-    team_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+    team_path = os.path.join(UPLOAD_FOLDER, team.id)
     existing_images_count = 0
     if os.path.exists(team_path) and os.path.isdir(team_path):
         existing_images_count = len([f for f in os.listdir(team_path)
@@ -527,7 +469,7 @@ def upload_file(short_id):
     if existing_images_count + len(files) > MAX_PHOTOS_PER_TEAM:
         return "Team photo limit exceeded.", 400
 
-    save_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+    save_path = os.path.join(UPLOAD_FOLDER, team.id)
     os.makedirs(save_path, exist_ok=True)
 
     for file in files:
@@ -558,30 +500,33 @@ def upload_file(short_id):
         file_path = os.path.join(save_path, f"{int(time.time())}_{secure_filename(file.filename)}")
         file.save(file_path)
 
-    return redirect(url_for('team_page', short_id=team.short_id))
+    return redirect(url_for('team_page', team_id=team.id))
 
 
 def is_allowed_image(filename):
     return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route('/uploads/<short_id>/<filename>')
-def serve_image(short_id, filename):
+@app.route('/uploads/<team_id>/<filename>')
+def serve_image(team_id, filename):
     if not is_allowed_image(filename):
         return abort(404, description="Invalid file type.")
 
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
+    # Find team in database by team_id
+    team = find_team_by_id(team_id)
     if not team:
         return abort(404, description="Invalid team URL.")
 
-    return send_from_directory(os.path.join(UPLOAD_FOLDER, team.short_id), secure_filename(filename))
+    return send_from_directory(os.path.join(UPLOAD_FOLDER, team.id), secure_filename(filename))
 
 
 @app.route('/login')
 def login():
-    # If user is already logged in, redirect to index
+    # If user is already logged in, redirect to next page or index
     if current_user.is_authenticated:
+        next_page = request.args.get('next')
+        if next_page and next_page.startswith('/'):
+            return redirect(next_page)
         return redirect(url_for('index'))
 
     error = request.args.get('error')
@@ -592,7 +537,10 @@ def login():
     }
     error_message = error_messages.get(error) if error else None
 
-    return render_template('login.html', providers=oauth_providers, error=error_message)
+    # Preserve the next URL for the OAuth links
+    next_url = request.args.get('next')
+
+    return render_template('login.html', providers=oauth_providers, error=error_message, next_url=next_url)
 
 @app.route('/logout')
 @login_required
@@ -605,12 +553,12 @@ def logout():
 def create_team():
     # Check if user is already associated with any team (as captain or member)
     existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-    existing_membership = TeamMembership.query.filter_by(user_id=current_user.id).first()
+    existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
 
-    if existing_captained_team:
+    if existing_captained_team and existing_captained_team.status not in ['withdrawn', 'cancelled']:
         return jsonify({'error': f'You have already created team "{existing_captained_team.name}"'}), 400
 
-    if existing_membership:
+    if existing_membership and existing_membership.team.status not in ['withdrawn', 'cancelled']:
         return jsonify({'error': f'You are already a member of team "{existing_membership.team.name}"'}), 400
 
     if request.method == 'GET':
@@ -623,6 +571,8 @@ def create_team():
         estimated_duration = request.form.get('estimated_duration', '').strip()
         comments = request.form.get('comments', '').strip()
         password = request.form.get('password', '').strip()
+        has_baton = request.form.get('has_baton') == 'on'
+        email_opt_in = request.form.get('email_opt_in') == 'true'
 
         # Validation
         if not team_name:
@@ -647,30 +597,47 @@ def create_team():
         # Create new team (status defaults to 'pending')
         new_team = Team(
             name=team_name,
-            short_id=generate_short_id(),
-            gallery_hash=generate_gallery_hash(),
             format=format_type,
             estimated_duration=estimated_duration,
             comments=comments if comments else None,
             password=password if password else None,
+            has_baton=has_baton,
             status='pending',
             captain_id=current_user.id
         )
 
         db.session.add(new_team)
-        db.session.commit()
+        db.session.flush()  # Flush to get the team ID before creating membership
 
-        # Create the team folder using short_id
-        team_folder_path = os.path.join(UPLOAD_FOLDER, new_team.short_id)
-        os.makedirs(team_folder_path, exist_ok=True)
-
-        # For solo teams, redirect directly to team members page since no preferences needed
+        # Always create TeamMembership for captain with standard defaults
+        captain_membership = None
         if format_type == 'Solo':
-            redirect_url = url_for('team_members', short_id=new_team.short_id)
-            message = 'Solo team created successfully!'
+            # Solo teams get reasonable defaults that can be edited later
+            captain_membership = TeamMembership(
+                user_id=current_user.id,
+                team_id=new_team.id,
+                willing_to_lead=True,
+                preferred_miles=36,    # Full distance default
+                planned_pace='8:00',   # Common pace
+                preferred_station=None,
+                comments=None
+            )
+            db.session.add(captain_membership)
+            redirect_url = url_for('team_members', team_id=new_team.id)
+            message = 'Solo entry created successfully! You can edit your preferences anytime.'
         else:
+            # Team format captains still need to set their preferences
+            # No membership created here - they'll create it via join form
             redirect_url = url_for('join_team')
             message = 'Team created successfully! Now enter your preferences.'
+
+        # Update email opt-in status for all team types
+        current_user.email_opt_in = email_opt_in
+
+        db.session.commit()
+
+        team_folder_path = os.path.join(UPLOAD_FOLDER, new_team.id)
+        os.makedirs(team_folder_path, exist_ok=True)
 
         return jsonify({
             'success': True,
@@ -691,13 +658,36 @@ def join_team():
     if request.method == 'GET':
         # Check if user is already associated with any team (as captain or member)
         existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id).first()
+        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
+        pending_captain_team = None
+
+        # Handle invite token if present in URL
+        invite_token = request.args.get('invite_token')
+        invited_team = None
+        error_message = None
+
+        if invite_token:
+            invited_team = Team.query.filter_by(invite_token=invite_token).first()
+            if not invited_team:
+                error_message = "The invitation link is invalid or has expired. Please select a team from the list below."
+            elif invited_team.status != 'complete':
+                error_message = f"The team '{invited_team.name}' is not currently accepting new members."
+                invited_team = None  # Don't pre-fill if team is not open
+
+        # Handle case where a captain just created a team and needs to join
+        if not invited_team and existing_captained_team and existing_captained_team.status == 'pending' and not existing_membership:
+            pending_captain_team = existing_captained_team
+
 
         # Get all teams with "Team" format and "complete" status (open for joining)
+        # Exclude closed teams as they're not accepting new members
         open_teams = Team.query.filter_by(format='Team', status='complete').all()
 
         # Determine mode and setup template data
-        if existing_membership or existing_captained_team:
+        if pending_captain_team:
+            mode = 'join'
+            existing_team = None
+        elif existing_membership or existing_captained_team:
             mode = 'switch'  # User can switch teams or edit current preferences
             existing_team = existing_membership.team if existing_membership else existing_captained_team
         else:
@@ -710,7 +700,10 @@ def join_team():
                              user=current_user,
                              mode=mode,
                              existing_team=existing_team,
-                             existing_membership=existing_membership)
+                             existing_membership=existing_membership,
+                             pending_captain_team=pending_captain_team,
+                             invited_team=invited_team,
+                             error_message=error_message)
 
     # Handle POST - delegate to shared handler
     return handle_team_registration_post(stations, mode='join')
@@ -742,7 +735,7 @@ def my_registration():
                                  existing_membership=existing_membership)
         elif existing_captained_team and existing_captained_team.format == 'Solo':
             # Solo captain - redirect to team members page
-            return redirect(url_for('team_members', short_id=existing_captained_team.short_id))
+            return redirect(url_for('team_members', team_id=existing_captained_team.id))
         else:
             # Team captain without membership - show edit form for their own team
             return render_template('participant_registration.html',
@@ -767,39 +760,51 @@ def handle_team_registration_post(stations, mode='join'):
         comments = request.form.get('comments', '').strip()
         waiver_agreed = request.form.get('waiver_agreed') == 'on'
         team_password = request.form.get('team_password', '').strip()
+        invite_token = request.form.get('invite_token')
+        email_opt_in = request.form.get('email_opt_in') == 'true'
 
         # Check if user is already associated with any team (as captain or member)
         existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id).first()
+        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
 
         # Validation
         if not team_id:
-            return jsonify({'error': 'Please select a team'}), 400
+            if not invite_token:
+                return jsonify({'error': 'Please select a team'}), 400
 
-        team = db.session.get(Team, team_id)
-        if not team:
-            return jsonify({'error': 'Selected team not found'}), 400
+        team = None
+        # Authorize joining the team
+        if invite_token:
+            team = Team.query.filter_by(invite_token=invite_token).first()
+            if not team:
+                return jsonify({'error': 'The invitation link is invalid or has expired.'}), 400
+            if team_id and int(team_id) != team.id:
+                return jsonify({'error': 'Invitation and selected team do not match.'}), 400
+        else:
+            if not team_id:
+                 return jsonify({'error': 'Please select a team'}), 400
+            team = db.session.get(Team, team_id)
 
-        # Handle team switching (user joining different team)
-        is_switching_teams = existing_membership and existing_membership.team_id != int(team_id)
-
-        if mode == 'edit':
-            # For edit mode, verify they're editing the correct team
-            if existing_captained_team and existing_captained_team.id != team.id:
-                return jsonify({'error': 'You can only edit preferences for your own team'}), 400
-            if existing_membership and not is_switching_teams and existing_membership.team_id != team.id:
-                return jsonify({'error': 'You can only edit preferences for your current team'}), 400
-        elif mode == 'join':
-            # For joining, check format requirements
-            if team.format != 'Team':
-                return jsonify({'error': 'This team is not open for joining'}), 400
-
-            # Check team password if required
-            if team.password:
+        # Authorization logic: Check if user can join this specific team
+        if team.status == 'complete':
+            # For complete teams, check password if required
+            if team.password and not invite_token: # Invite token bypasses password
                 if not team_password:
                     return jsonify({'error': 'This team requires a password'}), 400
                 if team_password != team.password:
                     return jsonify({'error': 'Incorrect team password'}), 400
+        elif team.status == 'pending':
+            # For pending teams, only the captain can register
+            if team.captain_id != current_user.id:
+                return jsonify({'error': 'This team is pending approval and not yet open for joining.'}), 403
+        else: # 'withdrawn' or other statuses
+            return jsonify({'error': f"Team '{team.name}' is not currently accepting new members."}), 403
+
+        if team.format == 'Solo':
+            return jsonify({'error': 'Solo teams cannot be joined.'}), 400
+
+        # Handle team switching (user joining different team)
+        is_switching_teams = existing_membership and existing_membership.team_id != team.id
 
         if not preferred_miles or not preferred_miles.isdigit():
             return jsonify({'error': 'Preferred miles must be a valid number'}), 400
@@ -862,13 +867,16 @@ def handle_team_registration_post(stations, mode='join'):
             db.session.add(membership)
             message = f'Successfully joined {team.name}'
 
+        # Update email opt-in status
+        current_user.email_opt_in = email_opt_in
+
         db.session.commit()
 
         return jsonify({
             'success': True,
             'message': message,
             'team_name': team.name,
-            'redirect_url': url_for('team_members', short_id=team.short_id)
+            'redirect_url': url_for('team_members', team_id=team.id)
         }), 201
 
     except Exception as e:
@@ -876,17 +884,14 @@ def handle_team_registration_post(stations, mode='join'):
         return jsonify({'error': f'Failed to process registration: {str(e)}'}), 500
 
 @app.route('/admin')
-@login_required
+@admin_required
 def admin():
-    if not current_user.is_admin:
-        abort(403)
-
     # Get all teams from database
     db_teams = Team.query.all()
 
     teams = []
     for team in db_teams:
-        team_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+        team_path = os.path.join(UPLOAD_FOLDER, team.id)
 
         # Count images in team folder (if it exists)
         image_count = 0
@@ -896,29 +901,46 @@ def admin():
 
         teams.append({
             'name': team.name,
-            'short_id': team.short_id,
-            'url': url_for('team_page', short_id=team.short_id),
+            'id': team.id,
+            'url': url_for('team_page', team_id=team.id),
             'image_count': image_count,
             'format': team.format,
             'estimated_duration': team.estimated_duration,
             'captain': team.captain,
             'created_at': team.created_at,
             'member_count': len([m for m in team.memberships if m.status == 'active']),
-            'status': team.status
+            'status': team.status,
+            'comments': team.comments
         })
 
-    return render_template('admin.html', teams=teams, user=current_user)
+    # Get all users from database
+    db_users = User.query.all()
+
+    users = []
+    for user in db_users:
+        # Get active memberships for this user
+        active_memberships = [m for m in user.memberships if m.status == 'active']
+
+        users.append({
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'avatar_url': user.avatar_url,
+            'is_admin': user.is_admin,
+            'created_at': user.created_at,
+            'active_memberships': active_memberships
+        })
+
+    return render_template('admin.html', teams=teams, users=users, user=current_user)
 
 
-@app.route('/team/<short_id>/delete', methods=['DELETE'])
-@login_required
-def delete_team(short_id):
-    if not current_user.is_admin:
-        abort(403)
+@app.route('/team/<team_id>/delete', methods=['DELETE'])
+@admin_required
+def delete_team(team_id):
 
     try:
-        # Find team in database by short_id
-        team = find_team_by_short_id(short_id)
+        # Find team in database by team_id
+        team = find_team_by_id(team_id)
 
         if not team:
             return jsonify({'error': 'Team not found'}), 404
@@ -931,7 +953,7 @@ def delete_team(short_id):
 
         # Remove the team folder and all its contents
         import shutil
-        team_path = os.path.join(UPLOAD_FOLDER, team.short_id)
+        team_path = os.path.join(UPLOAD_FOLDER, team.id)
         if os.path.exists(team_path):
             shutil.rmtree(team_path)
 
@@ -944,15 +966,70 @@ def delete_team(short_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to delete team: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/approve', methods=['POST'])
-@login_required
-def approve_team(short_id):
-    if not current_user.is_admin:
-        abort(403)
+@app.route('/user/<user_id>/delete', methods=['DELETE'])
+@admin_required
+def delete_user(user_id):
 
     try:
-        # Find team in database by short_id
-        team = find_team_by_short_id(short_id)
+        # Find user in database
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Check if user is a captain of any teams
+        captained_teams = Team.query.filter_by(captain_id=user.id).all()
+
+        for team in captained_teams:
+            # Count active team members (excluding captain)
+            active_members = TeamMembership.query.filter_by(
+                team_id=team.id,
+                status='active'
+            ).filter(TeamMembership.user_id != user.id).count()
+
+            # If team has other active members, cannot delete captain
+            if active_members > 0:
+                return jsonify({
+                    'error': f'Cannot delete user. They are the captain of team "{team.name}" which has other active members. Please transfer captaincy first.'
+                }), 400
+
+        # Delete user's team memberships
+        TeamMembership.query.filter_by(user_id=user.id).delete()
+
+        # Delete any teams where user was the only captain
+        for team in captained_teams:
+            # Delete team folder if it exists
+            team_folder = os.path.join(UPLOAD_FOLDER, team.id)
+            if os.path.exists(team_folder):
+                import shutil
+                shutil.rmtree(team_folder)
+
+            # Delete team from database
+            db.session.delete(team)
+
+        # Store user email for response message
+        user_email = user.email
+        user_name = user.name
+
+        # Delete the user account
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'User "{user_name}" ({user_email}) deleted successfully'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+
+@app.route('/team/<team_id>/approve', methods=['POST'])
+@admin_required
+def approve_team(team_id):
+
+    try:
+        # Find team in database by team_id
+        team = find_team_by_id(team_id)
 
         if not team:
             return jsonify({'error': 'Team not found'}), 404
@@ -973,18 +1050,9 @@ def approve_team(short_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to approve team: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/withdraw', methods=['POST'])
-@login_required
-def withdraw_team(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
-
-    if not team:
-        return jsonify({'error': 'Team not found'}), 404
-
-    # Check if user is admin or team captain
-    if not (current_user.is_admin or team.captain_id == current_user.id):
-        abort(403)
+@app.route('/team/<team_id>/withdraw', methods=['POST'])
+@team_captain_required()
+def withdraw_team(team_id, team):
 
     if team.status == 'withdrawn':
         return jsonify({'error': 'Team is already withdrawn'}), 400
@@ -1006,18 +1074,9 @@ def withdraw_team(short_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to withdraw team: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/unwithdraw', methods=['POST'])
-@login_required
-def unwithdraw_team(short_id):
-    # Find team in database by short_id
-    team = find_team_by_short_id(short_id)
-
-    if not team:
-        return jsonify({'error': 'Team not found'}), 404
-
-    # Check if user is admin or team captain
-    if not (current_user.is_admin or team.captain_id == current_user.id):
-        abort(403)
+@app.route('/team/<team_id>/unwithdraw', methods=['POST'])
+@team_captain_required()
+def unwithdraw_team(team_id, team):
 
     if team.status != 'withdrawn':
         return jsonify({'error': 'Team is not withdrawn'}), 400
@@ -1036,19 +1095,79 @@ def unwithdraw_team(short_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to un-withdraw team: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/member/<int:membership_id>/withdraw', methods=['POST'])
-@login_required
-def withdraw_membership(short_id, membership_id):
+@app.route('/team/<team_id>/cancel', methods=['POST'])
+@team_captain_required()
+def cancel_team(team_id, team):
+
+    if team.status != 'pending':
+        return jsonify({'error': 'Only pending teams can be cancelled'}), 400
+
+    if team.status == 'cancelled':
+        return jsonify({'error': 'Team is already cancelled'}), 400
+
     try:
-        # Find membership in database
-        membership = db.session.get(TeamMembership, membership_id)
+        # Update team status to cancelled
+        team.status = 'cancelled'
+        db.session.commit()
 
-        if not membership:
-            return jsonify({'error': 'Membership not found'}), 404
+        return jsonify({
+            'success': True,
+            'message': f'Team "{team.name}" cancelled successfully'
+        }), 200
 
-        # Check if user is the member or admin
-        if not (current_user.id == membership.user_id or current_user.is_admin):
-            abort(403)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to cancel team: {str(e)}'}), 500
+
+@app.route('/team/<team_id>/close', methods=['POST'])
+@team_captain_required()
+def close_team(team_id, team):
+
+    if team.status != 'complete':
+        return jsonify({'error': 'Only complete teams can be closed'}), 400
+
+    if team.status == 'closed':
+        return jsonify({'error': 'Team is already closed'}), 400
+
+    try:
+        # Update team status to closed
+        team.status = 'closed'
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Team "{team.name}" closed to new registrations'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to close team: {str(e)}'}), 500
+
+@app.route('/team/<team_id>/reopen', methods=['POST'])
+@team_captain_required()
+def reopen_team(team_id, team):
+
+    if team.status != 'closed':
+        return jsonify({'error': 'Team is not closed'}), 400
+
+    try:
+        # Update team status back to complete
+        team.status = 'complete'
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Team "{team.name}" reopened for new registrations'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to reopen team: {str(e)}'}), 500
+
+@app.route('/team/<team_id>/member/<membership_id>/withdraw', methods=['POST'])
+@team_captain_or_member_required()
+def withdraw_membership(team_id, membership_id, team, membership):
+    try:
 
         if membership.status == 'withdrawn':
             return jsonify({'error': 'Membership is already withdrawn'}), 400
@@ -1066,19 +1185,10 @@ def withdraw_membership(short_id, membership_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to withdraw membership: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/member/<int:membership_id>/unwithdraw', methods=['POST'])
-@login_required
-def unwithdraw_membership(short_id, membership_id):
+@app.route('/team/<team_id>/member/<membership_id>/unwithdraw', methods=['POST'])
+@team_captain_or_member_required()
+def unwithdraw_membership(team_id, membership_id, team, membership):
     try:
-        # Find membership in database
-        membership = db.session.get(TeamMembership, membership_id)
-
-        if not membership:
-            return jsonify({'error': 'Membership not found'}), 404
-
-        # Check if user is the member or admin
-        if not (current_user.id == membership.user_id or current_user.is_admin):
-            abort(403)
 
         if membership.status != 'withdrawn':
             return jsonify({'error': 'Membership is not withdrawn'}), 400
@@ -1096,23 +1206,14 @@ def unwithdraw_membership(short_id, membership_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to re-join team: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/member/<int:membership_id>/remove', methods=['POST'])
-@login_required
-def remove_member(short_id, membership_id):
+@app.route('/team/<team_id>/member/<membership_id>/remove', methods=['POST'])
+@team_captain_required()
+def remove_member(team_id, membership_id, team):
     try:
         # Find membership in database
         membership = db.session.get(TeamMembership, membership_id)
         if not membership:
             return jsonify({'error': 'Membership not found'}), 404
-
-        # Find the team
-        team = db.session.get(Team, membership.team_id)
-        if not team:
-            return jsonify({'error': 'Team not found'}), 404
-
-        # Check if user is the team captain
-        if current_user.id != team.captain_id:
-            return jsonify({'error': 'Only team captains can remove members'}), 403
 
         # Can't remove the captain
         if membership.user_id == team.captain_id:
@@ -1157,7 +1258,7 @@ def delete_account():
         # Delete any teams where user was the only captain
         for team in captained_teams:
             # Delete team folder if it exists
-            team_folder = os.path.join(UPLOAD_FOLDER, team.short_id)
+            team_folder = os.path.join(UPLOAD_FOLDER, team.id)
             if os.path.exists(team_folder):
                 import shutil
                 shutil.rmtree(team_folder)
@@ -1182,18 +1283,10 @@ def delete_account():
         db.session.rollback()
         return jsonify({'error': f'Failed to delete account: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/promote/<int:new_captain_id>', methods=['POST'])
-@login_required
-def transfer_captain(short_id, new_captain_id):
+@app.route('/team/<team_id>/promote/<new_captain_id>', methods=['POST'])
+@team_captain_required()
+def transfer_captain(team_id, new_captain_id, team):
     try:
-        # Find team by short_id
-        team = find_team_by_short_id(short_id)
-        if not team:
-            return jsonify({'error': 'Team not found'}), 404
-
-        # Check if current user is the captain
-        if team.captain_id != current_user.id:
-            return jsonify({'error': 'Only the current captain can transfer captaincy'}), 403
 
         # Check if new captain is a member of the team
         new_captain = User.query.get(new_captain_id)
@@ -1223,18 +1316,51 @@ def transfer_captain(short_id, new_captain_id):
         db.session.rollback()
         return jsonify({'error': f'Failed to transfer captaincy: {str(e)}'}), 500
 
-@app.route('/team/<short_id>/password', methods=['POST'])
-@login_required
-def manage_team_password(short_id):
-    try:
-        # Find team by short_id
-        team = find_team_by_short_id(short_id)
-        if not team:
-            return jsonify({'error': 'Team not found'}), 404
 
-        # Check if current user is the captain or admin
-        if not (current_user.is_admin or team.captain_id == current_user.id):
-            return jsonify({'error': 'Only team captains or admins can manage team passwords'}), 403
+@app.route('/team/<team_id>/details', methods=['POST'])
+@team_captain_required()
+def update_team_details(team_id, team):
+    """
+    Allows the team captain to update team details like estimated duration.
+    """
+    try:
+
+        if team.status in ['withdrawn', 'cancelled']:
+            return jsonify({'error': f'Cannot update details for a {team.status} team.'}), 403
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request data is required'}), 400
+
+        estimated_duration = data.get('estimated_duration', '').strip()
+        comments = data.get('comments', '').strip()
+        has_baton = data.get('has_baton') == True
+
+        # Validation
+        if not estimated_duration:
+            return jsonify({'error': 'Estimated duration is required'}), 400
+
+        import re
+        if not re.match(r'^\d{1,2}:\d{2}$', estimated_duration):
+            return jsonify({'error': 'Duration must be in HH:MM format (e.g., 05:30 or 12:00)'}), 400
+
+        team.estimated_duration = estimated_duration
+        team.comments = comments if comments else None
+        if team.status == 'pending':
+            team.has_baton = has_baton
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Team details updated successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update team details: {str(e)}'}), 500
+
+
+@app.route('/team/<team_id>/password', methods=['POST'])
+@team_captain_required()
+def manage_team_password(team_id, team):
+    try:
 
         # Get password from request
         data = request.get_json()
@@ -1262,6 +1388,34 @@ def manage_team_password(short_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to manage team password: {str(e)}'}), 500
+
+@app.route('/team/<team_id>/invite-link', methods=['POST'])
+@team_captain_required()
+def generate_invite_link(team_id, team):
+    try:
+
+        # Generate a new secure, URL-safe token (22 characters)
+        invite_token = secrets.token_urlsafe(16)
+        team.invite_token = invite_token
+        db.session.commit()
+
+        # Construct the full invite URL
+        invite_url = url_for('join_team', invite_token=invite_token, _external=True)
+
+        return jsonify({
+            'success': True,
+            'invite_link': invite_url,
+            'message': 'Invite link generated successfully. Share it with your team members.'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to generate invite link: {str(e)}'}), 500
+
+@app.route('/privacy')
+def privacy_policy():
+    """Renders the privacy policy page."""
+    return render_template('privacy.html')
 
 # Initialize database
 with app.app_context():
