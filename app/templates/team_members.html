@@ -6,58 +6,20 @@
 </head>
 <body>
 
-    <div class="container mt-4">
+    <div class="container my-4">
         {% include '_navbar.html' %}
 
-        <!-- Pending Team Warning -->
-        {% if team.status == 'pending' %}
-        <div class="alert alert-warning">
-            <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
-            {% if team.format == 'Solo' %}
-                <strong>Solo Entry Pending Approval</strong><br>
-                Your solo registration is awaiting admin approval.
-                <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
-                {% if not team.has_baton %}
-                <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
-                {% endif %}
-            {% else %}
-                <strong>Team Registration Pending Approval</strong><br>
-                Your team registration is awaiting admin approval. Until approved:
-                <ul class="mb-0 mt-2">
-                    <li>Other users cannot join this team</li>
-                    <li>The team will not appear in the public team list</li>
-                    <li>Photo uploads are disabled</li>
-                </ul>
-                <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
-                {% if not team.has_baton %}
-                <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
-                {% endif %}
-            {% endif %}
-        </div>
-        {% endif %}
+        {% include '_team_status_alerts.html' %}
 
-        <!-- Cancelled Team Warning -->
-        {% if team.status == 'cancelled' %}
-        <div class="alert alert-secondary">
-            <ion-icon name="ban-outline" class="me-2"></ion-icon>
-            <strong>Team Cancelled:</strong> The captain has canceled this team's registration. Please <a href="{{ url_for('join_team') }}">join another</a> or create a <a href="{{ url_for('create_team')}}">new team</a> if you'd like to participate.
-        </div>
-        {% endif %}
-
-        <!-- Withdrawn Team Warning -->
-        {% if team.status == 'withdrawn' %}
-        <div class="alert alert-warning" >
-            <ion-icon name="warning-outline" class="me-2"></ion-icon>
-            <strong>Team Withdrawn:</strong> Your captain has withdrawn the team from the event. Please <a href="{{ url_for('join_team') }}">join another</a> or create a <a href="{{ url_for('create_team')}}">new team</a> if you'd like to participate.
-        </div>
-        {% endif %}
+        {% set captain_has_joined = active_members | selectattr('user_id', 'equalto', team.captain_id) | list | length > 0 %}
+        <h1> {{team.name }} Members </h1>
 
         <div class="row">
             <div class="col-12">
                 {% if team.format == 'Team' %}
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">Team Roster ({{ active_members|length + withdrawn_members|length }})</h5>
+                        <h5 class="card-title mb-0">Roster ({{ active_members|length + withdrawn_members|length }})</h5>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -124,10 +86,10 @@
                                                     <strong>End Station:</strong> {{ membership.preferred_station }}<br>
                                                 {% endif %}
                                                 {% if membership.comments %}
-                                                    <strong>Notes:</strong> {{ membership.comments }}
+                                                    <strong>Comments:</strong> {{ membership.comments }}
                                                 {% endif %}
                                                 {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                    <a href="{{ url_for('my_registration') }}" class="text-primary text-decoration-none">
+                                                    <a href="{{ url_for('user.my_registration') }}" class="text-primary text-decoration-none">
                                                         <small><ion-icon name="create-outline" class="me-1"></ion-icon>Edit Preferences</small>
                                                     </a>
                                                 {% endif %}
@@ -215,7 +177,7 @@
                                                     <strong>End Station:</strong> {{ membership.preferred_station }}<br>
                                                 {% endif %}
                                                 {% if membership.comments %}
-                                                    <strong>Notes:</strong> {{ membership.comments }}
+                                                    <strong>Comments:</strong> {{ membership.comments }}
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -276,7 +238,7 @@
                                                     <strong>End Station:</strong> {{ membership.preferred_station }}<br>
                                                 {% endif %}
                                                 {% if membership.comments %}
-                                                    <strong>Notes:</strong> {{ membership.comments }}
+                                                    <strong>Comments:</strong> {{ membership.comments }}
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -365,18 +327,21 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="mb-3">
+                                    <div class="mb-3{% if team.status == 'pending' %} opacity-50{% endif %}">
                                         <h6>Invite Members</h6>
                                         <p class="text-muted small">Share this unique link to allow others to join your team directly, bypassing the team list and password.</p>
+                                        {% if team.status == 'pending' %}
+                                        <p class="text-muted small"><em>Invite links are disabled while your team is pending approval.</em></p>
+                                        {% endif %}
                                         <div id="invite-alert-container"></div>
                                         <div class="input-group mb-2">
                                             <input type="text" class="form-control" id="inviteLink"
-                                                   value="{% if team.invite_token %}{{ url_for('join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly>
-                                            <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token %}disabled{% endif %}>
+                                                   value="{% if team.invite_token %}{{ url_for('join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly {% if team.status == 'pending' %}disabled{% endif %}>
+                                            <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token or team.status == 'pending' %}disabled{% endif %}>
                                                 <ion-icon name="copy-outline"></ion-icon> Copy
                                             </button>
                                         </div>
-                                        <button class="btn btn-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()">
+                                        <button class="btn btn-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()" {% if team.status == 'pending' %}disabled{% endif %}>
                                             <ion-icon name="sparkles-outline"></ion-icon> {% if team.invite_token %}Regenerate Link{% else %}Generate Link{% endif %}
                                         </button>
                                         <small class="text-muted d-block mt-2">Regenerating the link will invalidate the old one.</small>
@@ -405,16 +370,12 @@
                                             <div class="form-text">Optional comments visible to the admin</div>
                                         </div>
                                         <div class="mb-3">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="has_baton_input" name="has_baton" value="true" {% if team.has_baton %}checked{% endif %} {% if team.status != 'pending' %}disabled{% endif %}>
-                                                <label class="form-check-label" for="has_baton_input">
-                                                    <ion-icon name="flag-outline" class="me-1"></ion-icon>
-                                                    I will bring a Light Rail Relay baton from a previous year.
-                                                </label>
-                                                {% if team.status != 'pending' %}
-                                                <div class="form-text">This setting can only be changed while the team registration is pending.</div>
-                                                {% endif %}
-                                            </div>
+                                            <label for="previous_baton_serial_input" class="form-label">Previous Baton Serial</label>
+                                            <input type="text" class="form-control" id="previous_baton_serial_input" name="previous_baton_serial" value="{{ team.previous_baton_serial or '' }}" maxlength="12" {% if team.status != 'pending' %}disabled{% endif %}>
+                                            <div class="form-text">If you have a baton from a previous year, enter its serial number here.</div>
+                                            {% if team.status != 'pending' %}
+                                            <div class="form-text">This setting can only be changed while the team registration is pending.</div>
+                                            {% endif %}
                                         </div>
                                         <div class="text-end">
                                             <button class="btn btn-primary" type="submit">
@@ -483,7 +444,7 @@
         };
 
         window.removeMember = async function(membershipId, memberName) {
-            if (!confirm(`Are you sure you want to remove ${memberName} from the team? This action will mark their membership as removed.`)) {
+            if (!confirm(`Are you sure you want to remove ${memberName} from the team? They will be asked to join another team.`)) {
                 return;
             }
 
@@ -540,14 +501,10 @@
             api.setButtonLoading(generateBtn, 'Generating...');
             api.clearAlerts(alertContainer);
 
-            const response = await fetch(`{{ url_for('generate_invite_link', team_id=team.id) }}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
+            const result = await teamAPI.generateInviteLink('{{ team.id }}');
 
-            const data = await response.json();
-
-            if (response.ok && data.success) {
+            if (result.success) {
+                const data = result.data;
                 const linkInput = document.getElementById('inviteLink');
                 const copyBtn = document.getElementById('copyInviteLinkBtn');
                 linkInput.value = data.invite_link;
@@ -556,17 +513,14 @@
 
                 api.showAlert(alertContainer, 'success', data.message);
             } else {
-                api.showAlert(alertContainer, 'danger', data.error || 'Failed to generate link');
+                api.showAlert(alertContainer, 'danger', result.error || 'Failed to generate link');
                 api.resetButton(generateBtn);
             }
         }
 
         // Team password management
         window.updateTeamPassword = async function(password) {
-            const result = await api.request(`{{ url_for('manage_team_password', team_id=team.id) }}`, {
-                method: 'POST',
-                body: JSON.stringify({ password: password })
-            });
+            const result = await teamAPI.manageTeamPassword('{{ team.id }}', password);
 
             if (result.success) {
                 alert(result.data.message);
@@ -581,10 +535,7 @@
                 return;
             }
 
-            const result = await api.request(`{{ url_for('manage_team_password', team_id=team.id) }}`, {
-                method: 'POST',
-                body: JSON.stringify({ password: null })
-            });
+            const result = await teamAPI.manageTeamPassword('{{ team.id }}', null);
 
             if (result.success) {
                 alert(result.data.message);
@@ -604,7 +555,7 @@
 
             if (result.success) {
                 alert(result.data.message);
-                window.location.href = '{{ url_for("index") }}';
+                window.location.href = '{{ url_for("main.index") }}';
             } else {
                 alert(result.error || 'Failed to withdraw team');
             }
@@ -631,13 +582,11 @@
                 return;
             }
 
-            const result = await api.request(`{{ url_for('cancel_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-                method: 'POST'
-            });
+            const result = await teamAPI.cancelTeam(shortId);
 
             if (result.success) {
                 alert(result.data.message);
-                window.location.href = '{{ url_for("index") }}';
+                window.location.href = '{{ url_for("main.index") }}';
             } else {
                 alert(result.error || 'Failed to cancel team');
             }
@@ -648,9 +597,7 @@
                 return;
             }
 
-            const result = await api.request(`{{ url_for('close_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-                method: 'POST'
-            });
+            const result = await teamAPI.closeTeam(shortId);
 
             if (result.success) {
                 alert(result.data.message);
@@ -665,9 +612,7 @@
                 return;
             }
 
-            const result = await api.request(`{{ url_for('reopen_team', team_id='TEMP_SHORT_ID') }}`.replace('TEMP_SHORT_ID', shortId), {
-                method: 'POST'
-            });
+            const result = await teamAPI.reopenTeam(shortId);
 
             if (result.success) {
                 alert(result.data.message);
@@ -705,8 +650,8 @@
                 const estimatedDuration = estimatedDurationInput.value.trim();
                 const commentsInput = document.getElementById('comments_input');
                 const comments = commentsInput.value.trim();
-                const hasBatonInput = document.getElementById('has_baton_input');
-                const hasBaton = hasBatonInput.checked;
+                const previousBatonSerialInput = document.getElementById('previous_baton_serial_input');
+                const previousBatonSerial = previousBatonSerialInput.value.trim();
 
                 if (!estimatedDuration) {
                     alert('Please enter an estimated duration.');
@@ -722,7 +667,7 @@
                 const result = await teamAPI.updateTeam('{{ team.id }}', {
                     estimated_duration: estimatedDuration,
                     comments: comments,
-                    has_baton: hasBaton
+                    previous_baton_serial: previousBatonSerial
                 });
 
                 if (result.success) {

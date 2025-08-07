@@ -6,7 +6,7 @@
 <body>
 
 
-<div class="container mt-4">
+<div class="container my-4">
 {% include '_navbar.html' %}
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
@@ -20,13 +20,20 @@
                 <div class="card-body">
                     <div id="alert-container"></div>
 
-                    <form id="create-team-form">
+                    {% if not current_user.is_authenticated %}
+                    <div class="alert alert-info mb-4" role="alert">
+                        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
+                        <a href="{{ url_for('auth.login') }}?next={{ url_for('user.create_team') }}" class="alert-link">Sign in</a> to create a team.
+                    </div>
+                    {% endif %}
+
+                    <form id="create-team-form"{% if not current_user.is_authenticated %} class="opacity-75"{% endif %}>
                         <div class="mb-3">
                             <label for="format" class="form-label">
                                 <ion-icon name="options" class="me-1"></ion-icon>
                                 Format <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" id="format" name="format" required>
+                            <select class="form-select" id="format" name="format" required{% if not current_user.is_authenticated %} disabled{% endif %}>
                                 <option value="">Select format...</option>
                                 <option value="Solo">Solo</option>
                                 <option value="Team">Team</option>
@@ -39,7 +46,7 @@
                                 <ion-icon name="flag" class="me-1"></ion-icon>
                                 Team Name <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control" id="team_name" name="team_name" required maxlength="255">
+                            <input type="text" class="form-control" id="team_name" name="team_name" required maxlength="255"{% if not current_user.is_authenticated %} disabled placeholder="Your team name would go here"{% endif %}>
                             <div class="form-text" id="team-name-help">Choose a unique name for your team</div>
                         </div>
 
@@ -49,7 +56,7 @@
                                 Estimated Duration <span class="text-danger">*</span>
                             </label>
                             <input type="text" class="form-control" id="estimated_duration" name="estimated_duration"
-                                   placeholder="1:30" pattern="^\d{1,2}:\d{2}$" required>
+                                   placeholder="1:30" pattern="^\d{1,2}:\d{2}$" required{% if not current_user.is_authenticated %} disabled{% endif %}>
                             <div class="form-text">Format: HH:MM (e.g., 1:30 for 1 hour 30 minutes)</div>
                         </div>
 
@@ -58,7 +65,7 @@
                                 <ion-icon name="lock-closed" class="me-1"></ion-icon>
                                 Team Password
                             </label>
-                            <input type="password" class="form-control" id="password" name="password" maxlength="255">
+                            <input type="password" class="form-control" id="password" name="password" maxlength="255"{% if not current_user.is_authenticated %} disabled{% endif %}>
                             <div class="form-text">Optional: Set a password to require for joining this team</div>
                         </div>
 
@@ -68,30 +75,29 @@
                                 Comments
                             </label>
                             <textarea class="form-control" id="comments" name="comments" rows="3"
-                                      placeholder="Any additional information about your team..."></textarea>
+                                      placeholder="Requests, concerns, questions..."{% if not current_user.is_authenticated %} disabled{% endif %}></textarea>
                             <div class="form-text">Optional: Anything you want the admin to know about your entry.</div>
                         </div>
 
                         <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="has_baton" name="has_baton" value="true">
-                                <label class="form-check-label" for="has_baton">
-                                    <ion-icon name="flag-outline" class="me-1"></ion-icon>
-                                    I will bring a Light Rail Relay baton from a previous year.
-                                </label>
-                            </div>
+                            <label for="previous_baton_serial" class="form-label">
+                                <ion-icon name="flag-outline" class="me-1"></ion-icon>
+                                Previous Baton Serial
+                            </label>
+                            <input type="text" class="form-control" id="previous_baton_serial" name="previous_baton_serial" maxlength="12" placeholder=""{% if not current_user.is_authenticated %} disabled{% endif %}>
+                            <div class="form-text">If you have a baton from a previous year, enter its serial number here and run with it again!</div>
                         </div>
 
-                        <div class="mb-3" id="baton-fee-warning" style="display: none;">
+                        <div class="mb-3" id="baton-fee-warning" style="display: block;">
                             <div class="alert alert-info">
                                 <ion-icon name="cash-outline" class="me-2"></ion-icon>
-                                A $16 charge for a new baton will be required for team approval.
+                                If you don't have a previous LRR baton, a $16 charge for a new baton will be required for team approval. See <a href="{{ url_for('main.payment') }}">payment details</a>.
                             </div>
                         </div>
 
                         <div class="mb-4" id="email-opt-in-section" style="display: none;">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if current_user.email_opt_in %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if current_user.email_opt_in %}checked{% endif %}{% if not current_user.is_authenticated %} disabled{% endif %}>
                                 <label class="form-check-label" for="email_opt_in">
                                     <ion-icon name="mail-outline" class="me-1"></ion-icon>
                                     Opt-in for information about the next event.
@@ -101,7 +107,7 @@
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary" id="submit-btn">
+                            <button type="submit" class="btn btn-primary" id="submit-btn"{% if not current_user.is_authenticated %} disabled{% endif %}>
                                 <ion-icon name="add-circle" class="me-1"></ion-icon>
                                 Create Team
                             </button>
@@ -166,24 +172,13 @@ function updateFormForFormat() {
     }
 }
 
-function updateBatonFeeWarning() {
-    const hasBatonCheckbox = document.getElementById('has_baton');
-    const batonFeeWarning = document.getElementById('baton-fee-warning');
-    if (hasBatonCheckbox && batonFeeWarning) {
-        batonFeeWarning.style.display = hasBatonCheckbox.checked ? 'none' : 'block';
-    }
-}
-
 // Run on page load to handle browser auto-fill/refresh state
 document.addEventListener('DOMContentLoaded', () => {
     updateFormForFormat();
-    updateBatonFeeWarning();
 });
 
 // Also run on change for user interaction
 document.getElementById('format').addEventListener('change', updateFormForFormat);
-
-document.getElementById('has_baton').addEventListener('change', updateBatonFeeWarning);
 
 document.getElementById('create-team-form').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -204,7 +199,7 @@ document.getElementById('create-team-form').addEventListener('submit', async fun
         api.showAlert(alertContainer, 'success', result.data.message, 'checkmark-circle');
 
         // Redirect after a short delay
-        api.redirectAfterDelay(result.data.redirect_url || '{{ url_for("join_team") }}');
+        api.redirectAfterDelay(result.data.redirect_url || '{{ url_for("user.join_team") }}');
     } else {
         // Show error message
         api.showAlert(alertContainer, 'danger', result.error || 'Failed to create team', 'warning');

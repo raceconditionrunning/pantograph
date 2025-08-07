@@ -6,16 +6,15 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container my-4">
     {% include '_navbar.html' %}
 
     <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-4">
+        <div class="col-md-8 col-lg-6">
             <div class="card shadow-sm mt-5">
                 <div class="card-body p-4">
                     <div class="text-center mb-4">
                         <h1 class="h3 mb-3 fw-normal">Sign In</h1>
-                        <p class="text-muted">Relay Photo Collector</p>
                     </div>
 
                     {% if error %}
@@ -26,7 +25,7 @@
 
                     <div class="d-grid gap-3">
                         {% for provider in providers %}
-                        <a href="{{ url_for('oauth_login', provider=provider.name, next=next_url) }}" class="btn btn-primary btn-lg">
+                        <a href="{{ url_for('auth.oauth_login', provider=provider.name, next=next_url) }}" class="btn btn-primary btn-lg">
                             <ion-icon name="logo-{{ provider.name }}" class="me-2"></ion-icon>
                             Continue with {{ provider.display_name }}
                         </a>
@@ -34,6 +33,9 @@
                     </div>
 
                     <div class="text-center mt-4">
+                        <p class="text-muted small">
+                        If you don't have an account yet, signing in will create one for you.
+                        </p>
                         <small class="text-muted">
                             <ion-icon name="shield-checkmark" class="me-1"></ion-icon>
                             Secure OAuth authentication

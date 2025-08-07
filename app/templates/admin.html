@@ -6,7 +6,7 @@
 </head>
 <body>
 
-<div class="container mt-4 mb-4">
+<div class="container my-4">
     {% include '_navbar.html' %}
 
     <h1>Admin</h1>
@@ -28,6 +28,7 @@
                                     <th>Members</th>
                                     <th>Photos</th>
                                     <th>Comments</th>
+                                    <th>Baton Serial</th>
                                     <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
@@ -60,7 +61,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ url_for('team_members', team_id=team.id) }}" target="_blank" class="text-decoration-none">
+                                        <a href="{{ url_for('teams.team_members', team_id=team.id) }}" target="_blank" class="text-decoration-none">
                                             {{ team.member_count }}
                                         </a>
                                     </td>
@@ -75,6 +76,12 @@
                                         {% else %}
                                         <span class="text-muted">—</span>
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ team.baton_serial or 'N/A' }}</span>
+                                        <button class="btn btn-sm btn-link" onclick="openEditBatonSerialModal('{{ team.id }}', '{{ team.name }}', '{{ team.baton_serial or '' }}')">
+                                            <ion-icon name="create-outline"></ion-icon>
+                                        </button>
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ team.created_at.strftime('%m/%d/%y') }}</small>
@@ -168,7 +175,7 @@
                                         {% if user.active_memberships %}
                                             {% for membership in user.active_memberships %}
                                                 <div class="mb-1">
-                                                    <a href="{{ url_for('team_members', team_id=membership.team.id) }}"
+                                                    <a href="{{ url_for('teams.team_members', team_id=membership.team.id) }}"
                                                        target="_blank" class="text-decoration-none">
                                                         <strong>{{ membership.team.name }}</strong>
                                                     </a>
@@ -196,10 +203,14 @@
                                                 <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" href="{{ url_for('my_registration') }}?user_id={{ user.id }}" target="_blank">
-                                                    <ion-icon name="settings-outline" class="me-2"></ion-icon>View Preferences
-                                                </a></li>
-                                                <li><hr class="dropdown-divider"></li>
+                                                {% if user.active_memberships %}
+                                                    {% for membership in user.active_memberships %}
+                                                    <li><a class="dropdown-item" href="{{ url_for('teams.view_member', team_id=membership.team.id, user_id=user.id) }}" target="_blank">
+                                                        <ion-icon name="settings-outline" class="me-2"></ion-icon>View {{ membership.team.name }} Preferences
+                                                    </a></li>
+                                                    {% endfor %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                {% endif %}
                                                 <li><a class="dropdown-item text-danger" href="#" onclick="confirmDeleteUser('{{ user.name }}', '{{ user.id }}')">
                                                     <ion-icon name="trash-outline" class="me-2"></ion-icon>Delete User
                                                 </a></li>
@@ -268,42 +279,6 @@
     </div>
 </div>
 
-<!-- Delete User Confirmation Modal -->
-<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteUserModalLabel">
-                    <ion-icon name="warning-outline" class="text-danger me-2"></ion-icon>
-                    Delete User
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-danger">
-                    <strong>⚠ Warning: This action cannot be undone!</strong>
-                </div>
-                <p>You are about to permanently delete the user <strong id="deleteUserName"></strong>.</p>
-                <p>This will:</p>
-                <ul>
-                    <li>Remove the user from all teams</li>
-                    <li>Delete their account and preferences</li>
-                    <li>Remove all their team memberships</li>
-                    <li>Remove them from the database</li>
-                </ul>
-                <p>Are you sure you want to continue?</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteUserBtn" disabled>
-                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
-                    Delete User
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Delete Team Confirmation Modal -->
 <div class="modal fade" id="deleteTeamModal" tabindex="-1" aria-labelledby="deleteTeamModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -340,78 +315,71 @@
     </div>
 </div>
 
+<!-- Edit Baton Serial Modal -->
+<div class="modal fade" id="editBatonSerialModal" tabindex="-1" aria-labelledby="editBatonSerialModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editBatonSerialModalLabel">Edit Baton Serial</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Editing baton serial for team <strong id="editBatonSerialTeamName"></strong>.</p>
+                <form id="editBatonSerialForm">
+                    <div class="mb-3">
+                        <label for="baton_serial_input" class="form-label">Baton Serial</label>
+                        <input type="text" class="form-control" id="baton_serial_input" name="baton_serial" maxlength="12">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBatonSerialBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="module">
 import * as bootstrap from 'bootstrap';
-import { userAPI, teamAPI, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
+import { userAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
 let currentShortId = null;
 let currentUserId = null;
+let currentTeamId = null;
+
+// Baton serial modal
+window.openEditBatonSerialModal = function(teamId, teamName, currentSerial) {
+    currentTeamId = teamId;
+    document.getElementById('editBatonSerialTeamName').textContent = teamName;
+    document.getElementById('baton_serial_input').value = currentSerial;
+    const modal = new bootstrap.Modal(document.getElementById('editBatonSerialModal'));
+    modal.show();
+}
+
+document.getElementById('saveBatonSerialBtn').addEventListener('click', async () => {
+    const newSerial = document.getElementById('baton_serial_input').value;
+    const result = await teamAPI.updateBatonSerial(currentTeamId, newSerial);
+    if (result.success) {
+        api.showToast(result.data.message, 'success');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editBatonSerialModal'));
+        modal.hide();
+        api.redirectAfterDelay(window.location.href, 1500);
+    } else {
+        api.showToast(result.error || 'Failed to update baton serial', 'danger');
+    }
+});
 
 // Copy to clipboard using shared utility
 window.copyToClipboard = async function(text) {
     const success = await Utils.copyToClipboard(text);
     if (success) {
-        showToast('URL copied to clipboard!', 'success');
+        api.showToast('URL copied to clipboard!', 'success');
     } else {
-        showToast('Failed to copy URL', 'danger');
+        api.showToast('Failed to copy URL', 'danger');
     }
 }
 
-// User deletion functions
-window.confirmDeleteUser = function(userName, userId) {
-    currentUserId = userId;
-    document.getElementById('deleteUserName').textContent = userName;
-
-    // Enable delete button after 3 seconds
-    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
-    deleteBtn.disabled = true;
-    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
-
-    setTimeout(() => {
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = 'Delete User';
-    }, 3000);
-
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
-    modal.show();
-
-    // Add click handler for delete button
-    deleteBtn.onclick = function() {
-        deleteUser(currentUserId);
-    };
-}
-
-window.deleteUser = async function(userId) {
-    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
-
-    // Show loading state
-    deleteBtn.disabled = true;
-    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
-
-    const result = await userAPI.deleteUser(userId);
-
-    if (result.success) {
-        // Show success toast
-        showToast(result.data.message, 'success');
-
-        // Hide modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
-        modal.hide();
-
-        // Reload page after short delay
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
-    } else {
-        // Show error toast
-        showToast(result.error || 'Failed to delete user', 'danger');
-
-        // Reset button
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = 'Delete User';
-    }
-}
 
 // Team deletion functions
 window.confirmDeleteTeam = function(teamName, shortId) {
@@ -449,19 +417,17 @@ window.deleteTeam = async function(shortId) {
 
     if (result.success) {
         // Show success toast
-        showToast(result.data.message, 'success');
+        api.showToast(result.data.message, 'success');
 
         // Hide modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('deleteTeamModal'));
         modal.hide();
 
         // Reload page after short delay
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
+        api.redirectAfterDelay(window.location.href, 1500);
     } else {
         // Show error toast
-        showToast(result.error || 'Failed to delete team', 'danger');
+        api.showToast(result.error || 'Failed to delete team', 'danger');
 
         // Reset button
         deleteBtn.disabled = false;
@@ -471,81 +437,48 @@ window.deleteTeam = async function(shortId) {
 
 // Team management functions
 window.approveTeam = async function(teamName, teamId) {
-    if (!confirm(`Are you sure you want to approve team "${teamName}"?`)) {
+    if (!api.confirm(`Are you sure you want to approve team "${teamName}"?`)) {
         return;
     }
 
-    const result = await fetch(`{{ url_for('approve_team', team_id='TEMP_TEAM_ID') }}`.replace("TEMP_TEAM_ID", teamId), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    });
+    const result = await teamAPI.approveTeam(teamId);
 
-    const data = await result.json();
-
-    if (result.ok && data.success) {
-        showToast(data.message, 'success');
-        setTimeout(() => window.location.reload(), 1500);
+    if (result.success) {
+        api.showToast(result.data.message, 'success');
+        api.redirectAfterDelay(window.location.href, 1500);
     } else {
-        showToast(data.error || 'Failed to approve team', 'danger');
+        api.showToast(result.error || 'Failed to approve team', 'danger');
     }
 }
 
 window.withdrawTeam = async function(teamName, shortId) {
-    if (!confirm(`Are you sure you want to withdraw team "${teamName}"?`)) {
+    if (!api.confirm(`Are you sure you want to withdraw team "${teamName}"?`)) {
         return;
     }
 
     const result = await teamAPI.withdrawTeam(shortId);
 
     if (result.success) {
-        showToast(result.data.message, 'success');
-        setTimeout(() => window.location.reload(), 1500);
+        api.showToast(result.data.message, 'success');
+        api.redirectAfterDelay(window.location.href, 1500);
     } else {
-        showToast(result.error || 'Failed to withdraw team', 'danger');
+        api.showToast(result.error || 'Failed to withdraw team', 'danger');
     }
 }
 
 window.cancelTeam = async function(teamName, shortId) {
-    if (!confirm(`Are you sure you want to cancel team "${teamName}"? This action is permanent and cannot be undone.`)) {
+    if (!api.confirm(`Are you sure you want to cancel team "${teamName}"? This action is permanent and cannot be undone.`)) {
         return;
     }
 
-    // Custom cancel endpoint - extend TeamAPI if needed
-    const result = await fetch(`{{ url_for('cancel_team', team_id='TEMP_TEAM_ID') }}`.replace("TEMP_TEAM_ID", shortId), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    });
+    const result = await teamAPI.cancelTeam(shortId);
 
-    const data = await result.json();
-
-    if (result.ok && data.success) {
-        showToast(data.message, 'success');
-        setTimeout(() => window.location.reload(), 1500);
+    if (result.success) {
+        api.showToast(result.data.message, 'success');
+        api.redirectAfterDelay(window.location.href, 1500);
     } else {
-        showToast(data.error || 'Failed to cancel team', 'danger');
+        api.showToast(result.error || 'Failed to cancel team', 'danger');
     }
-}
-
-// Toast notification using Bootstrap
-window.showToast = function(message, type = 'success') {
-    const bgClass = type === 'success' ? 'text-bg-success' : 'text-bg-danger';
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center ${bgClass} border-0 position-fixed`;
-    toast.style.cssText = 'top: 20px; right: 20px; z-index: 1060;';
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">${message}</div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
-    document.body.appendChild(toast);
-
-    // Show and auto-hide the toast
-    const bsToast = new bootstrap.Toast(toast);
-    bsToast.show();
-    setTimeout(() => {
-        toast.remove();
-    }, 4000);
 }
 </script>
 

@@ -1,0 +1,45 @@
+<!-- Pending Team Warning -->
+{% if team.status == 'pending' %}
+<div class="alert alert-warning" role="alert">
+    <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
+    {% if team.format == 'Solo' %}
+        <strong>Solo Entry Pending Approval</strong><br>
+        Your solo registration is awaiting admin approval.
+        <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
+        {% if not team.previous_baton_serial %}
+        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
+        {% endif %}
+    {% else %}
+        <strong>Team Registration Pending Approval</strong><br>
+        Your team registration is awaiting admin approval. Until approved:
+        <ul class="mb-0 mt-2">
+            <li>Other users cannot join this team</li>
+            <li>The team will not appear in the public team list</li>
+            <li>Photo uploads are disabled</li>
+        </ul>
+        <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
+        {% if not team.previous_baton_serial %}
+        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
+        {% endif %}
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Cancelled Team Warning -->
+{% if team.status == 'cancelled' %}
+<div class="alert alert-secondary" role="alert">
+    <ion-icon name="ban-outline" class="me-2"></ion-icon>
+    <strong>Team Cancelled:</strong> The captain has canceled this team's registration. Please <a href="{{ url_for('user.join_team') }}">join another</a> or create a <a href="{{ url_for('user.create_team')}}">new team</a> if you'd like to participate.
+</div>
+{% endif %}
+
+<!-- Withdrawn Team Warning -->
+{% if team.status == 'withdrawn' %}
+<div class="alert alert-secondary" role="alert">
+    <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
+    <strong>Team Status: Withdrawn</strong> - This team has been withdrawn from the event.
+    {% if current_user.is_authenticated and not current_user.is_captain_of(team) %}
+        Please <a href="{{ url_for('user.join_team') }}">join another</a> or create a <a href="{{ url_for('user.create_team')}}">new team</a> if you'd like to participate.
+    {% endif %}
+</div>
+{% endif %}

@@ -1,0 +1,45 @@
+<footer class="container mt-5 py-4">
+    <div class="d-flex justify-content-center gap-4">
+        <a href="{{ url_for('main.privacy_policy') }}" class="text-muted text-decoration-none small">Privacy Policy</a>
+        <a href="https://www.lightrailrelay.com/" class="text-muted text-decoration-none small" target="_blank" rel="noopener noreferrer">
+            Event Page <ion-icon name="open-outline" style="vertical-align: -1px;"></ion-icon>
+        </a>
+    </div>
+</footer>
+
+
+<!-- Delete User Confirmation Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUserModalLabel">
+                    <ion-icon name="warning-outline" class="text-danger me-2"></ion-icon>
+                    Delete User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>⚠ Warning: This action cannot be undone!</strong>
+                </div>
+                <p>You are about to permanently delete the user <strong id="deleteUserName"></strong>.</p>
+                <p>This will:</p>
+                <ul>
+                    <li>Remove the user from all teams</li>
+                    <li>Delete their account and preferences</li>
+                    <li>Remove all their team memberships</li>
+                    <li>Remove them from the database</li>
+                </ul>
+                <p>Are you sure you want to continue?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUserBtn" disabled>
+                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                    Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

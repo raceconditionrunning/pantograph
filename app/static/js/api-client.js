@@ -224,6 +224,64 @@ export class TeamAPI extends ApiClient {
             body: JSON.stringify(data)
         });
     }
+
+    // Cancel team (admin)
+    async cancelTeam(teamId) {
+        const url = this.buildUrl('cancelTeam', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST'
+        });
+    }
+
+    // Approve team (admin)
+    async approveTeam(teamId) {
+        const url = this.buildUrl('approveTeam', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST'
+        });
+    }
+
+    // Close team
+    async closeTeam(teamId) {
+        const url = this.buildUrl('closeTeam', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST'
+        });
+    }
+
+    // Reopen team
+    async reopenTeam(teamId) {
+        const url = this.buildUrl('reopenTeam', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST'
+        });
+    }
+
+    // Generate invite link
+    async generateInviteLink(teamId) {
+        const url = this.buildUrl('generateInviteLink', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST'
+        });
+    }
+
+    // Manage team password (set or remove)
+    async manageTeamPassword(teamId, password) {
+        const url = this.buildUrl('manageTeamPassword', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST',
+            body: JSON.stringify({ password: password })
+        });
+    }
+
+    // Update baton serial (admin)
+    async updateBatonSerial(teamId, newSerial) {
+        const url = this.buildUrl('updateBatonSerial', { team_id: teamId });
+        return await this.request(url, {
+            method: 'POST',
+            body: JSON.stringify({ baton_serial: newSerial })
+        });
+    }
 }
 
 // Membership Management API
@@ -250,9 +308,9 @@ export class MembershipAPI extends ApiClient {
 
     // Withdraw membership
     async withdrawMembership(teamId, membershipId) {
-        const url = this.buildUrl('withdrawMembership', { 
-            team_id: teamId, 
-            membership_id: membershipId 
+        const url = this.buildUrl('withdrawMembership', {
+            team_id: teamId,
+            user_id: membershipId
         });
         return await this.request(url, {
             method: 'POST'
@@ -261,9 +319,9 @@ export class MembershipAPI extends ApiClient {
 
     // Un-withdraw membership
     async unwithdrawMembership(teamId, membershipId) {
-        const url = this.buildUrl('unwithdrawMembership', { 
-            team_id: teamId, 
-            membership_id: membershipId 
+        const url = this.buildUrl('unwithdrawMembership', {
+            team_id: teamId,
+            user_id: membershipId
         });
         return await this.request(url, {
             method: 'POST'
@@ -272,9 +330,9 @@ export class MembershipAPI extends ApiClient {
 
     // Remove member
     async removeMember(teamId, membershipId) {
-        const url = this.buildUrl('removeMember', { 
-            team_id: teamId, 
-            membership_id: membershipId 
+        const url = this.buildUrl('removeMember', {
+            team_id: teamId,
+            user_id: membershipId
         });
         return await this.request(url, {
             method: 'POST'
@@ -283,9 +341,9 @@ export class MembershipAPI extends ApiClient {
 
     // Promote to captain
     async promoteToCaptain(teamId, newCaptainId) {
-        const url = this.buildUrl('promoteToCaptain', { 
-            team_id: teamId, 
-            new_captain_id: newCaptainId 
+        const url = this.buildUrl('promoteToCaptain', {
+            team_id: teamId,
+            user_id: newCaptainId
         });
         return await this.request(url, {
             method: 'POST'
@@ -296,20 +354,14 @@ export class MembershipAPI extends ApiClient {
 // User Management API
 export class UserAPI extends ApiClient {
     // Delete user account
-    async deleteAccount() {
-        const url = this.getUrl('deleteAccount');
+    async deleteUser(user_id) {
+        const url = this.buildUrl('deleteUser', { user_id: user_id });
         return await this.request(url, {
             method: 'DELETE'
+
         });
     }
 
-    // Delete user (admin)
-    async deleteUser(userId) {
-        const url = this.buildUrl('deleteUser', { user_id: userId });
-        return await this.request(url, {
-            method: 'DELETE'
-        });
-    }
 
     // Update user preferences
     async updatePreferences(data) {
@@ -323,10 +375,11 @@ export class UserAPI extends ApiClient {
 
 // Image Management API
 export class ImageAPI extends ApiClient {
-    // Upload images
-    async uploadImages(formData, progressCallback = null) {
+    // Upload images to team
+    async uploadImages(teamId, formData, progressCallback = null) {
         try {
             const xhr = new XMLHttpRequest();
+            const url = this.buildUrl('uploadImages', { team_id: teamId });
 
             return new Promise((resolve, reject) => {
                 xhr.upload.addEventListener('progress', (e) => {
@@ -353,7 +406,7 @@ export class ImageAPI extends ApiClient {
                     resolve({ success: false, error: 'Network error' });
                 });
 
-                xhr.open('POST', window.location.pathname);
+                xhr.open('POST', url);
                 xhr.send(formData);
             });
         } catch (error) {
@@ -361,11 +414,11 @@ export class ImageAPI extends ApiClient {
         }
     }
 
-    // Delete image
-    async deleteImage(filename) {
-        return await this.request(window.location.pathname, {
-            method: 'DELETE',
-            body: JSON.stringify({ filename })
+    // Delete image by ID
+    async deleteImage(teamId, imageId) {
+        const url = this.buildUrl('deleteImage', { team_id: teamId, image_id: imageId });
+        return await this.request(url, {
+            method: 'DELETE'
         });
     }
 

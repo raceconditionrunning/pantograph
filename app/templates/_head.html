@@ -1,0 +1,153 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+<script>
+// Bootstrap theme switching based on system preference. Has to run early or we get a flash of light theme.
+(() => {
+    'use strict'
+
+    const getPreferredTheme = () => {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    const setTheme = theme => {
+        document.documentElement.setAttribute('data-bs-theme', theme)
+    }
+
+    // Set initial theme
+    setTheme(getPreferredTheme())
+
+    // Listen for changes in color scheme preference
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        setTheme(getPreferredTheme())
+    })
+})();
+</script>
+
+<script type="importmap">
+    {
+      "imports": {
+        "bootstrap": "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/js/bootstrap.esm.min.js",
+        "d3": "https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm",
+        "maplibre-gl": "https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.js",
+        "masonry-layout": "https://cdnjs.cloudflare.com/ajax/libs/masonry/4.2.2/masonry.pkgd.min.js",
+        "noUiSlider": "https://cdnjs.cloudflare.com/ajax/libs/nouislider/15.7.1/nouislider.min.mjs",
+        "photoswipe": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe.esm.min.js",
+        "photoswipe-lightbox": "https://cdnjs.cloudflare.com/ajax/libs/photoswipe/5.4.2/photoswipe-lightbox.esm.min.js",
+        "tabulator-tables": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator_esm.js",
+        "@turf": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/+esm",
+        "@popperjs/core": "https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/esm/popper.min.js",
+        "exifreader": "https://cdn.jsdelivr.net/npm/exifreader@4.31.1/+esm",
+        "heic-to": "https://cdn.jsdelivr.net/npm/heic-to@1.2.1/+esm"
+      }
+    }
+</script>
+
+<script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+<script type="module">
+// Global Bootstrap initialization for all pages
+import 'bootstrap';
+ import { Modal } from 'bootstrap';
+
+// Import and initialize shared API client
+import { api, userAPI, configureUrls } from '{{ url_for("static", filename="js/api-client.js") }}';
+
+// Configure all URLs using Flask's url_for - done once for entire application
+configureUrls({
+    // Team management
+    createTeam: '{{ url_for("user.create_team") }}',
+    joinTeam: '{{ url_for("user.join_team") }}',
+    myRegistration: '{{ url_for("user.my_registration") }}',
+
+{% if team and permissions.can_manage_team(current_user, team) %}
+    // Team captain management
+    withdrawTeam: '{{ url_for("teams.withdraw_team", team_id="__TEAM_ID__") }}',
+    unwithdrawTeam: '{{ url_for("teams.unwithdraw_team", team_id="__TEAM_ID__") }}',
+    cancelTeam: '{{ url_for("teams.cancel_team", team_id="__TEAM_ID__") }}',
+    updateTeam: '{{ url_for("teams.update_team_details", team_id="__TEAM_ID__") }}',
+    closeTeam: '{{ url_for("teams.close_team", team_id="__TEAM_ID__") }}',
+    reopenTeam: '{{ url_for("teams.reopen_team", team_id="__TEAM_ID__") }}',
+    generateInviteLink: '{{ url_for("teams.generate_invite_link", team_id="__TEAM_ID__") }}',
+    manageTeamPassword: '{{ url_for("teams.manage_team_password", team_id="__TEAM_ID__") }}',
+        // Membership management
+    withdrawMembership: '{{ url_for("teams.withdraw_membership", team_id="__TEAM_ID__", user_id="__USER_ID__") }}',
+    unwithdrawMembership: '{{ url_for("teams.unwithdraw_membership", team_id="__TEAM_ID__", user_id="__USER_ID__") }}',
+    removeMember: '{{ url_for("teams.remove_member", team_id="__TEAM_ID__", user_id="__USER_ID__") }}',
+    promoteToCaptain: '{{ url_for("teams.transfer_captain", team_id="__TEAM_ID__", user_id="__USER_ID__") }}',
+    {% endif %}
+
+    // User management
+    deleteUser: '{{ url_for("user.delete_user", user_id="__USER_ID__") }}',
+    updatePreferences: '{{ url_for("user.my_registration") }}',
+
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    // Admin routes
+    approveTeam: '{{ url_for("admin.approve_team", team_id="__TEAM_ID__") }}',
+    deleteTeam: '{{ url_for("admin.delete_team", team_id="__TEAM_ID__") }}',
+    admin: '{{ url_for("admin.admin_dashboard") }}',
+    {% endif %}
+
+    // Other routes
+    index: '{{ url_for("main.index") }}',
+    login: '{{ url_for("auth.login") }}',
+    deleteUser: '{{ url_for("user.delete_user", user_id="__USER_ID__") }}',
+});
+
+
+// User deletion functions
+window.confirmDeleteUser = function(userName, userId) {
+    document.getElementById('deleteUserName').textContent = userName;
+
+    // Enable delete button after 3 seconds
+    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+
+    setTimeout(() => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete User';
+    }, 3000);
+
+    // Show modal
+    const modal = new Modal(document.getElementById('deleteUserModal'));
+    modal.show();
+
+    // Add click handler for delete button
+    deleteBtn.onclick = function() {
+        deleteUser(userId);
+    };
+}
+
+window.deleteUser = async function(userId) {
+    const deleteBtn = document.getElementById('confirmDeleteUserBtn');
+
+    // Show loading state
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+
+    const result = await userAPI.deleteUser(userId);
+
+    if (result.success) {
+        // Show success toast
+        api.showToast(result.data.message, 'success');
+
+        // Hide modal
+        const modal = Modal.getInstance(document.getElementById('deleteUserModal'));
+        modal.hide();
+
+        // Reload page after short delay
+        api.redirectAfterDelay(window.location.href, 1500);
+    } else {
+        // Show error toast
+        api.showToast(result.error || 'Failed to delete user', 'danger');
+
+        // Reset button
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete User';
+    }
+}
+</script>
+

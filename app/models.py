@@ -15,7 +15,8 @@ class Team(db.Model):
     password = db.Column(db.String(255), nullable=True)  # Optional password for joining
     invite_token = db.Column(db.String(32), unique=True, nullable=True) # Shareable, revocable invite token
     status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'complete', 'withdrawn', 'cancelled', 'closed'
-    has_baton = db.Column(db.Boolean, default=False)
+    previous_baton_serial = db.Column(db.String(12), nullable=True)
+    baton_serial = db.Column(db.String(12), nullable=True)
     captain_id = db.Column(db.String(8), db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -89,3 +90,28 @@ class User(db.Model, UserMixin):
 
     def __repr__(self):
         return f'<User {self.email}>'
+
+
+class Image(db.Model):
+    id = db.Column(db.String(8), primary_key=True, default=lambda: secrets.token_urlsafe(6))
+    filename = db.Column(db.String(255), nullable=False)  # Original filename
+    file_path = db.Column(db.String(500), nullable=False)  # Storage path relative to uploads
+    team_id = db.Column(db.String(8), db.ForeignKey('team.id'), nullable=False)
+    uploaded_by = db.Column(db.String(8), db.ForeignKey('user.id'), nullable=False)
+    upload_time = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # EXIF data
+    capture_time = db.Column(db.DateTime, nullable=True)
+    gps_lat = db.Column(db.Float, nullable=True)
+    gps_lng = db.Column(db.Float, nullable=True)
+    
+    # File info
+    file_size = db.Column(db.Integer, nullable=True)
+    mime_type = db.Column(db.String(100), nullable=True)
+    
+    # Relationships
+    team = db.relationship('Team', backref='images')
+    uploader = db.relationship('User', backref='uploaded_images')
+    
+    def __repr__(self):
+        return f'<Image {self.filename} by {self.uploader.name}>'

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+    <title>Payment Information - Relay Photo Collector</title>
+</head>
+<body>
+
+<div class="container my-4">
+    {% include '_navbar.html' %}
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <ion-icon name="card-outline" class="me-2"></ion-icon>
+                        Baton Payment Information
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <h4>What You're Getting</h4>
+                    <p>This $16 payment is for one official Light Rail Relay baton, which you'll receive on Angle Lake platform before the event. Each team is required to have a baton to participate in the relay. If you have a baton from a previous year, you do <b>not</b> need to purchase a new one. Bring it and run with it again!</p>
+
+                    <h4>Payment Instructions</h4>
+                    <p>To pay for your baton, please send $16 to <strong>@lightrailrelay</strong> on Venmo or PayPal. Please include your team name in the payment description.</p>
+                    <p>Once your payment is received, your team captain will be notified and your team's registration will be approved.</p>
+
+                    <h4>Refund Policy</h4>
+                    <p>Payments are refundable until midnight September 13th, 2025. Simply <a href="mailto:{{ contact_email }}">contact us</a>. Beyond this point, consider inviting someone else to be captain of the team to use your baton if you can't participate.</p>
+                    <p>If the event is cancelled or rescheduled, any team may request a refund.</p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    {% include '_footer.html' %}
+</div>
+
+</body>
+</html>

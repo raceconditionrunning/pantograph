@@ -8,52 +8,29 @@
 <body>
 
 
-<div class="container mt-4 mb-4">
+<div class="container my-4">
   {% include '_navbar.html' %}
 
 
-{% if team.status == 'pending' %}
-<div class="alert alert-warning" role="alert">
-    <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
-    {% if team.format == 'Solo' %}
-        <strong>Solo Entry Pending Approval</strong><br>
-        Your solo registration is awaiting admin approval.
-        <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
-        {% if not team.has_baton %}
-        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval.</small>
-        {% endif %}
-    {% else %}
-        <strong>Team Registration Pending Approval</strong><br>
-        Your team registration is awaiting admin approval. Until approved:
-        <ul class="mb-0 mt-2">
-            <li>Other users cannot join this team</li>
-            <li>The team will not appear in the public team list</li>
-            <li>Photo uploads are disabled</li>
-        </ul>
-        <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
-    {% endif %}
-</div>
-{% elif team.status == 'withdrawn' %}
-<div class="alert alert-secondary" role="alert">
-  <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
-  <strong>Team Status: Withdrawn</strong> - This team has been withdrawn from the event.
-</div>
-{% endif %}
+{% include '_team_status_alerts.html' %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1>{{ team.name }}</h1>
+  <h1>{{ team.name }} Photos</h1>
 </div>
 
 
 {% if permissions.can_access_team(current_user, team) %}
-<div class="alert alert-info" role="alert">
-  <ion-icon name="link-outline" class="me-2"></ion-icon>
-  <strong>Public View Link:</strong> Share this link for view-only access to your gallery:<br>
-  <div class="input-group mt-2">
-    <input type="text" class="form-control" id="publicLink" value="{{ request.url_root }}gallery/{{ team.gallery_hash }}" readonly>
-    <button class="btn btn-outline-secondary" type="button" onclick="copyPublicLink()">
-      <ion-icon name="copy-outline"></ion-icon> Copy
-    </button>
-  </div>
+<div class="mb-4 p-3 border rounded bg-light-subtle">
+    <label for="publicLink" class="form-label fw-semibold">
+        <ion-icon name="link-outline" class="me-1"></ion-icon>
+        Public Gallery Link
+    </label>
+    <p class="form-text mt-0 mb-2">Share this view-only link with friends and family.</p>
+    <div class="input-group input-group-sm">
+        <input type="text" class="form-control" id="publicLink" value="{{ request.url_root }}gallery/{{ team.gallery_hash }}" readonly>
+        <button class="btn btn-outline-secondary" type="button" onclick="copyPublicLink()">
+            <ion-icon name="copy-outline"></ion-icon> Copy
+        </button>
+    </div>
 </div>
 {% endif %}
 
@@ -94,8 +71,12 @@
   {% endfor %}
   {% if images | length == 0 %}
     <div class="col">
-      <div class="alert alert-warning" role="alert">
-        No images uploaded yet.
+      <div class="text-center text-muted p-5 border rounded">
+          <ion-icon name="images-outline" style="font-size: 3rem;"></ion-icon>
+          <p class="mt-2 mb-0">No photos have been uploaded yet.</p>
+          {% if permissions.can_upload_to_team(current_user, team) %}
+          <p class="small">Use the form above to add the first one.</p>
+          {% endif %}
       </div>
     </div>
   {% endif %}
