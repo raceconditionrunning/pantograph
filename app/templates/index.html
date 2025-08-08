@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
-    <title>Relay Photo Collector</title>
+    <title>{{ app_name }}</title>
 </head>
 <body>
 
@@ -10,12 +10,11 @@
 <div class="container my-4">
     {% include '_navbar.html' %}
     <div class="row justify-content-center">
-        <div class="col-md-6">
+        <div class="col-8 col-lg-6">
             <div class="card shadow-sm">
                 <div class="card-body text-center">
-                    <h2 class="card-title">Welcome to the Snappy!</h2>
-                    <p class="lead">This is the official platform for Light Rail Relay registration and photo collection.</p>
-                    <p>Here, you can create or join a team to register for the relay. You can upload exchange photos for timing.</p>
+                    <h2 class="card-title">Pantograph</h2>
+                    <p>Register for <a href="https://lightrailrelay.com">Light Rail Relay</a> by creating or joining a team. Upload exchange photos for timing.</p>
                     <hr>
                     {% if current_user.is_authenticated %}
                         {% set user_membership = current_user.memberships | selectattr('status', 'equalto', 'active') | first if current_user.memberships else none %}
@@ -23,28 +22,33 @@
 
                         {% if user_team %}
                             <p>Welcome back!</p>
-                            <a href="{{ url_for('teams.team_members', team_id=user_team.id) }}" class="btn btn-primary mx-1">
+                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                            <a href="{{ url_for('teams.team_members', team_id=user_team.id) }}" class="btn btn-primary btn-lg mx-1">
                                 {% if user_team.format == 'Solo' %}
-                                    <ion-icon name="person-outline" class="me-1"></ion-icon> My Entry
+                                    <ion-icon name="person-outline" class="me-1"></ion-icon> Entry
                                 {% else %}
                                     <ion-icon name="people-outline" class="me-1"></ion-icon> Team Members
                                 {% endif %}
                             </a>
-                            <a href="{{ url_for('teams.gallery', team_id=user_team.id) }}" class="btn btn-primary mx-1">
-                                <ion-icon name="images-outline" class="me-1"></ion-icon> Photo Gallery
+
+                            <a href="{{ url_for('teams.gallery', team_id=user_team.id) }}" class="btn btn-primary btn-lg mx-1">
+                                <ion-icon name="images-outline" class="me-1"></ion-icon> Photos
                             </a>
+                              </div>
                         {% else %}
                             <p>You're not on a team yet. Get started by creating or joining one.</p>
-                            <a href="{{ url_for('user.create_team') }}" class="btn btn-primary mx-1">
+                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                            <a href="{{ url_for('user.create_team') }}" class="btn btn-primary btn-lg mx-1">
                                 <ion-icon name="add-circle-outline" class="me-1"></ion-icon> Create Team
                             </a>
-                            <a href="{{ url_for('user.join_team') }}" class="btn btn-primary mx-1">
+                            <a href="{{ url_for('user.join_team') }}" class="btn btn-primary btn-lg mx-1">
                                 <ion-icon name="person-add-outline" class="me-1"></ion-icon> Join Team
                             </a>
+                    </div>
                         {% endif %}
                     {% else %}
                         <p>Please sign in to create or join a team.</p>
-                        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">
                             <ion-icon name="log-in-outline" class="me-1"></ion-icon> Sign in to Get Started
                         </a>
                     {% endif %}

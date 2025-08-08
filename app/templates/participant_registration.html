@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
-    <title>Join Team - Relay Photo Collector</title>
+    <title>Join Team - {{ app_name }}</title>
 </head>
 <body>
 
@@ -37,6 +37,13 @@
                 </div>
                 <div class="card-body">
                     <div id="alert-container"></div>
+
+                    {% if pending_captain_team %}
+                    <div class="alert alert-info mb-4" role="alert">
+                        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
+                        <strong>Welcome, Captain!</strong> Please complete your preferences below to finalize your team setup.
+                    </div>
+                    {% endif %}
 
                     {% if mode == 'preview' %}
                     <div class="alert alert-info mb-4" role="alert">
@@ -144,8 +151,6 @@
                             </select>
                             {% if invited_team %}
                                 <div class="form-text">You were invited to join this team. Fill out your preferences below.</div>
-                            {% elif pending_captain_team %}
-                                 <div class="alert alert-info mt-2">Your team is pending admin approval. Please fill out your preferences below to complete your registration.</div>
                             {% elif not is_team_selection_disabled %}
                                 <div class="form-text">Select from available "Team" format teams</div>
                             {% endif %}
@@ -238,13 +243,11 @@
                         <div class="mb-4">
                             <h5 class="mb-3">
                                 <ion-icon name="document-text" class="me-2"></ion-icon>
-                                Waiver Agreement
+                                Waiver and Release
                             </h5>
                             <div class="card bg-secondary">
-                                <div class="card-body">
-                                    <p class="card-text text-muted">
-                                        <em>Waiver text will be provided here...</em>
-                                    </p>
+                                <div class="card-body card-text text-muted overflow-auto" style="max-height: 300px">
+                                    {% include '_waiver.html' %}
                                 </div>
                             </div>
                             <div class="form-check mt-3 ms-lg-4">
@@ -288,7 +291,7 @@
                                     {% endif %}
                                 {% endif %}
                             {% elif mode == 'preview' or (mode != 'edit' and mode != 'view') %}
-                            <button type="submit" class="btn btn-primary" id="submit-btn" {% if mode == 'preview' %}disabled{% endif %}>
+                            <button type="submit" class="btn btn-success" id="submit-btn" {% if mode == 'preview' %}disabled{% endif %}>
                                 <ion-icon name="person-add" class="me-1"></ion-icon>
                                 {% if mode == 'preview' %}Join Team{% else %}Join Team{% endif %}
                             </button>
@@ -341,22 +344,17 @@ if (plannedPaceInput) {
 document.getElementById('join-team-form').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const submitBtn = document.getElementById('submit-btn');
     const alertContainer = document.getElementById('alert-container');
 
     // Clear previous alerts
     api.clearAlerts(alertContainer);
 
-    // Determine which endpoint to use
-    const currentPath = window.location.pathname;
-    const isEditing = currentPath === '{{ url_for("user.my_registration") }}';
-
     let result;
-    if (isEditing) {
+    {% if mode == 'edit' %}
         result = await membershipAPI.updateMembership(new FormData(this));
-    } else {
+    {% else %}
         result = await membershipAPI.joinTeam(new FormData(this));
-    }
+    {% endif %}
 
     if (result.success) {
         // Show success message

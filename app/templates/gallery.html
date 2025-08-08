@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   {% include '_head.html' %}
-  <title>Team {{ team.name }} Photo Upload</title>
+  <title>Team {{ team.name }} Photos - {{ app_name }}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha256-V2sIX92Uh6ZaGSFTKMHghsB85b9toJtmazgG09AI2uk=" crossorigin="anonymous">
 </head>
 <body>
@@ -71,7 +71,7 @@
   {% endfor %}
   {% if images | length == 0 %}
     <div class="col">
-      <div class="text-center text-muted p-5 border rounded">
+      <div class="text-center text-muted p-5 border rounded mb-4">
           <ion-icon name="images-outline" style="font-size: 3rem;"></ion-icon>
           <p class="mt-2 mb-0">No photos have been uploaded yet.</p>
           {% if permissions.can_upload_to_team(current_user, team) %}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+    <title>Confirm Account Creation - {{ app_name }}</title>
+</head>
+<body>
+
+<div class="container my-4">
+    {% include '_navbar.html' %}
+
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm mt-5">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <h1 class="h3 fw-normal">Create New Account?</h1>
+                    </div>
+
+                    <p class="mb-4">
+                        There's no existing account for <strong>{{ email }}</strong>.
+                    </p>
+
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    {% if avatar_url %}
+                                        <img src="{{ avatar_url }}" alt="Profile" class="rounded-circle" width="60" height="60">
+                                    {% else %}
+                                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                            <ion-icon name="person" class="text-white" style="font-size: 1.5rem;"></ion-icon>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col">
+                                    <div class="fw-bold">
+                                        {{ name or 'Not provided' }}
+                                    </div>
+                                    <div>
+                                        {{ email }}
+                                    </div>
+                                    <div class="small">
+                                        Via {{ provider|title }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if error %}
+                    <div class="alert alert-danger" role="alert">
+                        <ion-icon name="warning" class="me-2"></ion-icon>{{ error }}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-warning">
+                        <ion-icon name="alert-circle" class="me-2"></ion-icon>
+                        <strong>Already have an account?</strong>
+                        <p class="mb-0 mt-2">
+                            If you previously signed up with a different provider (Google, GitHub, or Microsoft),
+                            please go back and use that provider instead.
+                        </p>
+                    </div>
+
+                    <div>
+                        <form method="POST" action="{{ url_for('auth.create_account') }}">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" name="agree_terms" required>
+                                <label class="form-check-label small" for="agreeTerms">
+                                    I agree to the <a href="{{ url_for('main.terms_of_service') }}" target="_blank">Terms of Service</a>
+                                </label>
+                            </div>
+
+                            <div class="row gap-2 justify-content-between">
+                                <div class="col-auto">
+                                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary w-100">
+                                        <ion-icon name="arrow-back" class="me-2"></ion-icon>
+                                        Back to Sign In
+                                    </a>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <ion-icon name="checkmark-circle" class="me-2"></ion-icon>
+                                        Create Account
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

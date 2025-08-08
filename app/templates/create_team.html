@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
+    <title>Create Team - {{ app_name }}</title>
 </head>
 <body>
 
@@ -107,7 +108,7 @@
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary" id="submit-btn"{% if not current_user.is_authenticated %} disabled{% endif %}>
+                            <button type="submit" class="btn btn-success" id="submit-btn"{% if not current_user.is_authenticated %} disabled{% endif %}>
                                 <ion-icon name="add-circle" class="me-1"></ion-icon>
                                 Create Team
                             </button>

@@ -17,3 +17,10 @@ def payment():
 def privacy_policy():
     """Renders the privacy policy page."""
     return render_template('privacy.html')
+
+
+@main.route('/terms')
+def terms_of_service():
+    """Renders the terms of service page."""
+    return render_template('terms.html', 
+                         contact_email=current_app.config.get('CONTACT_EMAIL'))

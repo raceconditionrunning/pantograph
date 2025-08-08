@@ -26,6 +26,9 @@ def get_secret(secret_name):
 
 
 class Config:
+    # Application Name
+    APPLICATION_NAME = "Pantograph"
+
     # Core Flask configuration
     SECRET_KEY = get_secret('URL_KEY')
 
@@ -40,8 +43,8 @@ class Config:
     GOOGLE_CLIENT_SECRET = get_secret('GOOGLE_CLIENT_SECRET')
     GITHUB_CLIENT_ID = get_secret('GITHUB_CLIENT_ID')
     GITHUB_CLIENT_SECRET = get_secret('GITHUB_CLIENT_SECRET')
-    META_CLIENT_ID = get_secret('META_CLIENT_ID')
-    META_CLIENT_SECRET = get_secret('META_CLIENT_SECRET')
+    MICROSOFT_CLIENT_ID = get_secret('MICROSOFT_CLIENT_ID')
+    MICROSOFT_CLIENT_SECRET = get_secret('MICROSOFT_CLIENT_SECRET')
 
     # Admin configuration
     ADMIN_EMAIL = get_secret('ADMIN_EMAIL')
@@ -58,5 +61,5 @@ class Config:
 OAUTH_PROVIDERS = [
     {'name': 'google', 'display_name': 'Google'},
     {'name': 'github', 'display_name': 'GitHub'},
-    {'name': 'meta', 'display_name': 'Meta'}
+    {'name': 'microsoft', 'display_name': 'Microsoft'}
 ]

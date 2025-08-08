@@ -210,19 +210,27 @@ def my_registration():
                                  user=current_user,
                                  mode='edit',
                                  existing_team=team,
-                                 existing_membership=existing_membership)
-        elif existing_captained_team and existing_captained_team.format == 'Solo':
-            # Solo captain - redirect to team members page
-            return redirect(url_for('teams.team_members', team_id=existing_captained_team.id))
-        else:
-            # Team captain without membership - show edit form for their own team
-            return render_template('participant_registration.html',
-                                 teams=[existing_captained_team],
-                                 stations=stations,
-                                 user=current_user,
-                                 mode='edit',
-                                 existing_team=existing_captained_team,
-                                 existing_membership=None)
+                                 existing_membership=existing_membership,
+                                 pending_captain_team=None)
+        elif existing_captained_team:
+            # If it's a solo team, they are redirected to team_members page
+            if existing_captained_team.format == 'Solo':
+                return redirect(url_for('teams.team_members', team_id=existing_captained_team.id))
+            else:
+                # This is a 'Team' format captain who needs to fill out their preferences
+                # The mode should be 'join' as they are effectively joining their own team
+                # And pending_captain_team should be set to display the banner
+                return render_template('participant_registration.html',
+                                     teams=[existing_captained_team],
+                                     stations=stations,
+                                     user=current_user,
+                                     mode='join',
+                                     existing_team=None,
+                                     existing_membership=None,
+                                     pending_captain_team=existing_captained_team)
+
+    # Fallback (should ideally not be reached)
+    return redirect(url_for('user.join_team'))
 
     # Handle POST - delegate to shared handler
     return handle_team_registration_post(stations, mode='edit')
@@ -361,29 +369,25 @@ def handle_team_registration_post(stations, mode='join'):
         db.session.rollback()
         return jsonify({'error': f'Failed to process registration: {str(e)}'}), 500
 
-
-@user.route('/user/<user_id>', methods=['DELETE'])
-@user_self_or_admin_required()
-def delete_user(user_id, user):
+def _perform_user_deletion(user_to_delete):
+    """Helper function to encapsulate user deletion logic."""
     try:
         # Check if user is a captain of any teams
-        captained_teams = Team.query.filter_by(captain_id=user.id).all()
+        captained_teams = Team.query.filter_by(captain_id=user_to_delete.id).all()
 
         for team in captained_teams:
             # Count active team members (excluding captain)
             active_members = TeamMembership.query.filter_by(
                 team_id=team.id,
                 status='active'
-            ).filter(TeamMembership.user_id != user.id).count()
+            ).filter(TeamMembership.user_id != user_to_delete.id).count()
 
             # If team has other active members, cannot delete captain
             if active_members > 0:
-                return jsonify({
-                    'error': f'Cannot delete user. They are the captain of team "{team.name}" which has other active members. Please transfer captaincy first.'
-                }), 400
+                return False, f'Cannot delete user. They are the captain of team "{team.name}" which has other active members. Please transfer captaincy first.'
 
         # Delete user's team memberships
-        TeamMembership.query.filter_by(user_id=user.id).delete()
+        TeamMembership.query.filter_by(user_id=user_to_delete.id).delete()
 
         # Delete any teams where user was the only captain
         for team in captained_teams:
@@ -396,18 +400,38 @@ def delete_user(user_id, user):
             db.session.delete(team)
 
         # Store user email for response message
-        user_email = user.email
-        user_name = user.name
+        user_email = user_to_delete.email
+        user_name = user_to_delete.name
 
         # Delete the user account
-        db.session.delete(user)
+        db.session.delete(user_to_delete)
         db.session.commit()
 
-        return jsonify({
-            'success': True,
-            'message': f'User "{user_name}" ({user_email}) deleted successfully'
-        }), 200
+        return True, f'User "{user_name}" ({user_email}) deleted successfully'
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+        return False, f'Failed to delete user: {str(e)}'
+
+
+@user.route('/delete-account', methods=['POST'])
+@login_required
+def delete_account():
+    """Endpoint to delete the current user's account"""
+    from flask_login import logout_user
+    success, message = _perform_user_deletion(current_user)
+    if success:
+        logout_user()
+        return jsonify({'success': True, 'message': message}), 200
+    else:
+        return jsonify({'error': message}), 400
+
+
+@user.route('/user/<user_id>', methods=['DELETE'])
+@user_self_or_admin_required()
+def delete_user(user_id, user):
+    success, message = _perform_user_deletion(user)
+    if success:
+        return jsonify({'success': True, 'message': message}), 200
+    else:
+        return jsonify({'error': message}), 400

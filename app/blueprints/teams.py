@@ -23,6 +23,13 @@ teams_public = Blueprint('teams_public', __name__)
 @teams.route('/<team_id>/gallery')
 @team_access_required()
 def gallery(team_id, team):
+    # If the current user is the captain and hasn't completed their registration for this team,
+    # redirect them to their registration page.
+    if current_user.is_authenticated and current_user.id == team.captain_id:
+        captain_membership = TeamMembership.query.filter_by(team_id=team.id, user_id=current_user.id).first()
+        if not captain_membership:
+            return redirect(url_for('user.my_registration'))
+
     from app.models import Image
 
     # Get images from database

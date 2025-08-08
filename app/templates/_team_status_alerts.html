@@ -7,7 +7,7 @@
         Your solo registration is awaiting admin approval.
         <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
         {% if not team.previous_baton_serial %}
-        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
+        <small class="text-muted d-block mt-2">Note: You must purchase a LRR baton. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
         {% endif %}
     {% else %}
         <strong>Team Registration Pending Approval</strong><br>
@@ -19,7 +19,7 @@
         </ul>
         <small class="text-muted">You'll be notified once your team is approved and ready for registration.</small>
         {% if not team.previous_baton_serial %}
-        <small class="text-muted d-block mt-2">Note: A $16 payment for a new baton is required for approval. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
+        <small class="text-muted d-block mt-2">Note: You must purchase a LRR baton. See <a href="{{ url_for('main.payment') }}">payment details</a>.</small>
         {% endif %}
     {% endif %}
 </div>

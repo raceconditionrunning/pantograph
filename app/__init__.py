@@ -17,6 +17,9 @@ def create_app():
     app = Flask(__name__, static_folder='static', template_folder='templates')
     app.config.from_object(Config)
 
+    # Make APPLICATION_NAME available globally in Jinja2 templates
+    app.jinja_env.globals['app_name'] = app.config['APPLICATION_NAME']
+
     # Ensure upload directory exists
     os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
 

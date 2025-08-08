@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
-    <title>{{ team.name }} - {% if team.format == 'Solo' %}My Entry{% else %}Team Members{% endif %}</title>
+    <title>{{ team.name }} - {% if team.format == 'Solo' %}My Entry{% else %}Team Members{% endif %} - {{ app_name }}</title>
 </head>
 <body>
 
@@ -12,7 +12,7 @@
         {% include '_team_status_alerts.html' %}
 
         {% set captain_has_joined = active_members | selectattr('user_id', 'equalto', team.captain_id) | list | length > 0 %}
-        <h1> {{team.name }} Members </h1>
+        <h1> {{team.name }}{% if team.type == "team" %} Members{% endif %}</h1>
 
         <div class="row">
             <div class="col-12">

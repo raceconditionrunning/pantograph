@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include '_head.html' %}
+    <title>Terms of Service - {{ app_name }}</title>
+</head>
+<body>
+
+<div class="container my-4">
+    {% include '_navbar.html' %}
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-5">
+                    <h1 class="h2 ">Terms of Service</h1>
+                    <p class="text-muted ">Last updated: August 8th, 2025</p>
+
+                    <section>
+                        <h2 class="h4">1. Service Description</h2>
+                        <p>Pantograph ("we", "our", "the service") provides a photo collection platform for relay race events. Participants can upload photos taken during races to share with their teams and event organizers.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">2. User Accounts & Authentication</h2>
+                        <p>To use our service, you must:</p>
+                        <ul>
+                            <li>Sign in using a supported OAuth provider (Google, GitHub, or Microsoft)</li>
+                            <li>Provide accurate account information</li>
+                            <li>Be responsible for maintaining the security of your account</li>
+                            <li>Be at least 13 years old (or the minimum age required in your jurisdiction)</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">3. Photo Upload Responsibilities</h2>
+                        <p>When uploading photos, you represent and warrant that:</p>
+                        <ul>
+                            <li>You own the photos or have permission to share them</li>
+                            <li>You have obtained necessary consent from people depicted in the photos</li>
+                            <li>Photos are appropriate and related to the relay event</li>
+                            <li>Photos do not violate any laws, copyrights, or third-party rights</li>
+                            <li>Photos do not contain offensive, inappropriate, or harmful content</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">4. Photo Usage Rights</h2>
+                        <p>By uploading photos to our service:</p>
+                        <ul>
+                            <li>You retain ownership of your photos</li>
+                            <li>Team members can view and download photos from their team's collection</li>
+                            <li>We may use photos for service operation, moderation, and improvement</li>
+                            <li>You can request photo removal by contacting the event organizers</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">5. Privacy & Data</h2>
+                        <p>We collect and store:</p>
+                        <ul>
+                            <li>Basic account information from your OAuth provider (name, email, profile picture)</li>
+                            <li>Photos you upload and their metadata (GPS coordinates, timestamps)</li>
+                            <li>Usage information to improve our service</li>
+                        </ul>
+                        <p>We do not sell your personal information. For detailed privacy practices, see our Privacy Policy.</p>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">6. Prohibited Uses</h2>
+                        <p>You may not use our service to:</p>
+                        <ul>
+                            <li>Upload inappropriate, offensive, or illegal content</li>
+                            <li>Violate others' privacy or rights</li>
+                            <li>Interfere with the service's operation</li>
+                            <li>Upload photos unrelated to relay events</li>
+                            <li>Share photos from other teams without permission</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">7. Content Moderation</h2>
+                        <p>We reserve the right to:</p>
+                        <ul>
+                            <li>Review and remove inappropriate content</li>
+                            <li>Suspend or terminate accounts that violate these terms</li>
+                            <li>Moderate content to ensure a safe, appropriate environment</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">8. Service Availability</h2>
+                        <p>Our service is provided "as is" without warranties. We may:</p>
+                        <ul>
+                            <li>Experience downtime or interruptions</li>
+                            <li>Modify or discontinue features</li>
+                            <li>Update these terms as needed</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">9. Limitation of Liability</h2>
+                        <p>To the maximum extent permitted by law, we are not liable for:</p>
+                        <ul>
+                            <li>Lost or damaged photos</li>
+                            <li>Unauthorized use of photos by third parties</li>
+                            <li>Service interruptions or data loss</li>
+                            <li>Indirect, incidental, or consequential damages</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 class="h4">10. Contact Information</h2>
+                        <p>For questions about these terms or to report issues, please contact us at:</p>
+                        <p><strong>Email:</strong> {{ contact_email }}</p>
+                    </section>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
