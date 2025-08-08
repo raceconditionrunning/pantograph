@@ -289,61 +289,75 @@
                                 <div class="col-md-6">
                                     <div class="mb-4">
                                         <h6>Team Password</h6>
-                                        <p class="text-muted small">Control access to your team by setting or changing the password.</p>
+                                        <p class="text-muted small">Control access to your team by setting or changing the password.            {% if team.password %}
+                                        <span type="button" class="btn btn-link d-inline-block px-0 text-secondary" onclick="removePassword()">
+                                            <small><ion-icon name="lock-open-outline" class="me-1"></ion-icon>Remove Password</small>
+                                        </span>
+                                        {% endif %}</p>
                                         <form id="password-form" class="mb-2">
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="team_password"
                                                        placeholder="{% if team.password %}Enter new password{% else %}Set team password{% endif %}"
                                                        >
                                                 <button class="btn btn-outline-primary" type="submit">
-                                                    <ion-icon name="key-outline" class="me-1"></ion-icon>
                                                     {% if team.password %}Update{% else %}Set{% endif %}
                                                 </button>
                                             </div>
                                         </form>
-                                        {% if team.password %}
-                                        <button type="button" class="btn btn-link px-0 text-secondary" onclick="removePassword()">
-                                            <small><ion-icon name="lock-open-outline" class="me-1"></ion-icon>Remove Password</small>
-                                        </button>
-                                        {% endif %}
+
                                     </div>
                                         {% if team.format == 'Team' and team.status in ['complete', 'closed'] %}
-                                    <div class="mt-3">
-                                        <h6>Team Registration</h6>
-                                        {% if team.status == 'closed' %}
-                                        <p class="text-muted small">Your team is closed to new registrations. Click to reopen.</p>
-                                        <button class="btn btn-outline-success" onclick="reopenTeam('{{ team.name }}', '{{ team.id }}')">
-                                            <ion-icon name="lock-open-outline" class="me-1"></ion-icon>
-                                            Reopen Team
-                                        </button>
-                                        {% else %}
-                                        <p class="text-muted small">Close your team to prevent new members from joining.</p>
-                                        <button class="btn btn-outline-secondary" onclick="closeTeam('{{ team.name }}', '{{ team.id }}')">
-                                            <ion-icon name="lock-closed-outline" class="me-1"></ion-icon>
-                                            Close Team
-                                        </button>
-                                        {% endif %}
+                                    <div class="mb-4">
+                                        <div class="d-flex justify-content-between align-items-start gap-3">
+                                            <div>
+                                                <h6>Team Registration</h6>
+                                                {% if team.status == 'closed' %}
+                                                <p class="text-muted small mb-0">Your team is closed to new registrations. Click to reopen.</p>
+                                                {% else %}
+                                                <p class="text-muted small mb-0">Close your team to prevent new members from joining.</p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex-shrink-0">
+                                                {% if team.status == 'closed' %}
+                                                <button class="btn btn-outline-success" onclick="reopenTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <ion-icon name="lock-open-outline"></ion-icon>
+                                                        <span>Reopen Team</span>
+                                                    </div>
+                                                </button>
+                                                {% else %}
+                                                <button class="btn btn-outline-secondary" onclick="closeTeam('{{ team.name }}', '{{ team.id }}')">
+                                                    Close Team
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </div>
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3{% if team.status == 'pending' %} opacity-50{% endif %}">
-                                        <h6>Invite Members</h6>
-                                        <p class="text-muted small">Share this unique link to allow others to join your team directly, bypassing the team list and password.</p>
-                                        {% if team.status == 'pending' %}
-                                        <p class="text-muted small"><em>Invite links are disabled while your team is pending approval.</em></p>
-                                        {% endif %}
-                                        <div id="invite-alert-container"></div>
+                                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                            <div>
+                                                <h6>Invite Members</h6>
+                                                <p class="text-muted small mb-0">Share this unique link to allow others to join your team directly, bypassing the password.</p>
+                                                {% if team.status == 'pending' %}
+                                                <p class="text-muted small mb-0"><em>Invite links are disabled while your team is pending approval.</em></p>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex-shrink-0">
+                                                <button class="btn btn-outline-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()" {% if team.status == 'pending' %}disabled{% endif %}>
+                                                    {% if team.invite_token %}Regenerate Link{% else %}Generate Link{% endif %}
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div class="input-group mb-2">
                                             <input type="text" class="form-control" id="inviteLink"
-                                                   value="{% if team.invite_token %}{{ url_for('join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly {% if team.status == 'pending' %}disabled{% endif %}>
+                                                   value="{% if team.invite_token %}{{ url_for('user.join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly {% if team.status == 'pending' %}disabled{% endif %}>
                                             <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token or team.status == 'pending' %}disabled{% endif %}>
                                                 <ion-icon name="copy-outline"></ion-icon> Copy
                                             </button>
                                         </div>
-                                        <button class="btn btn-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()" {% if team.status == 'pending' %}disabled{% endif %}>
-                                            <ion-icon name="sparkles-outline"></ion-icon> {% if team.invite_token %}Regenerate Link{% else %}Generate Link{% endif %}
-                                        </button>
                                         <small class="text-muted d-block mt-2">Regenerating the link will invalidate the old one.</small>
                                     </div>
 
@@ -356,7 +370,7 @@
                                 <div class="col-12">
                                     <h6>Update Details</h6>
                                     <p class="text-muted small">Update your entry's time estimate and comments.</p>
-                                    <form id="update-details-form">
+                                    <form id="update-details-form" class="small">
                                         <div class="mb-3">
                                             <label for="estimated_duration_input" class="form-label">Estimated Duration</label>
                                             <input type="text" class="form-control" id="estimated_duration_input"
@@ -372,14 +386,13 @@
                                         <div class="mb-3">
                                             <label for="previous_baton_serial_input" class="form-label">Previous Baton Serial</label>
                                             <input type="text" class="form-control" id="previous_baton_serial_input" name="previous_baton_serial" value="{{ team.previous_baton_serial or '' }}" maxlength="12" {% if team.status != 'pending' %}disabled{% endif %}>
-                                            <div class="form-text">If you have a baton from a previous year, enter its serial number here.</div>
-                                            {% if team.status != 'pending' %}
-                                            <div class="form-text">This setting can only be changed while the team registration is pending.</div>
-                                            {% endif %}
+                                            <div class="form-text">If you have a baton from a previous year, enter its serial number here.  {% if team.status != 'pending' %}You can't change this after you've paid and your team is approved.
+
+                                            {% endif %}</div>
+
                                         </div>
                                         <div class="text-end">
-                                            <button class="btn btn-primary" type="submit">
-                                                <ion-icon name="save-outline" class="me-1"></ion-icon> Save Changes
+                                            <button class="btn btn-outline-primary" type="submit">Save Changes
                                             </button>
                                         </div>
                                     </form>
@@ -389,32 +402,36 @@
                         {% endif %}
                         <div class="row">
                             <div class="col-12">
-                                <h6>Entry Management</h6>
-                                {% if team.status == 'withdrawn' %}
-                                <p class="text-muted small">Your {% if team.format == 'Solo' %}entry has{% else %}team has{% endif %} been withdrawn. Click to re-enter the event.</p>
-                                <div class="text-end">
-                                    <button class="btn btn-outline-success" onclick="unwithdrawTeam('{{ team.name }}', '{{ team.id }}')">
-                                        <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>
-                                        Un-withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
-                                    </button>
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div>
+                                        <h6>Entry Management</h6>
+                                        {% if team.status == 'withdrawn' %}
+                                        <p class="text-muted small mb-0">Your {% if team.format == 'Solo' %}entry has{% else %}team has{% endif %} been withdrawn. Click to re-enter the event.</p>
+                                        {% elif team.status == 'pending' %}
+                                        <p class="text-muted small mb-0">Cancel your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} registration if you no longer wish to participate.</p>
+                                        {% else %}
+                                        <p class="text-muted small mb-0">Withdraw your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} from the event if needed.</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-shrink-0">
+                                        {% if team.status == 'withdrawn' %}
+                                        <button class="btn btn-outline-success" onclick="unwithdrawTeam('{{ team.name }}', '{{ team.id }}')">
+                                            Un-withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                        </button>
+                                        {% elif team.status == 'pending' %}
+                                        <button class="btn btn-outline-danger" onclick="cancelTeam('{{ team.name }}', '{{ team.id }}')">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <ion-icon name="close-circle-outline"></ion-icon>
+                                                <span>Cancel {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}</span>
+                                            </div>
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-outline-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
+                                            Withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                        </button>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                {% elif team.status == 'pending' %}
-                                <p class="text-muted small">Cancel your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} registration if you no longer wish to participate.</p>
-                                <div class="text-end">
-                                    <button class="btn btn-outline-danger" onclick="cancelTeam('{{ team.name }}', '{{ team.id }}')">
-                                        <ion-icon name="close-circle-outline" class="me-1"></ion-icon>
-                                        Cancel {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
-                                    </button>
-                                </div>
-                                {% else %}
-                                <p class="text-muted small">Withdraw your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} from the event if needed.</p>
-                                <div class="text-end">
-                                    <button class="btn btn-outline-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
-                                        <ion-icon name="exit-outline" class="me-1"></ion-icon>
-                                        Withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
-                                    </button>
-                                </div>
-                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -436,10 +453,12 @@
             const result = await membershipAPI.withdrawMembership('{{ team.id }}', membershipId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to withdraw membership');
+                api.showToast(result.error || 'Failed to withdraw membership', 'danger');
             }
         };
 
@@ -451,10 +470,12 @@
             const result = await membershipAPI.removeMember('{{ team.id }}', membershipId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to remove member');
+                api.showToast(result.error || 'Failed to remove member', 'danger');
             }
         };
 
@@ -466,10 +487,12 @@
             const result = await membershipAPI.promoteToCaptain(shortId, newCaptainId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to transfer captaincy');
+                api.showToast(result.error || 'Failed to transfer captaincy', 'danger');
             }
         };
 
@@ -495,11 +518,9 @@
 
         window.generateInviteLink = async function() {
             const generateBtn = document.getElementById('generateInviteLinkBtn');
-            const alertContainer = document.getElementById('invite-alert-container');
             const originalBtnHTML = generateBtn.innerHTML;
 
             api.setButtonLoading(generateBtn, 'Generating...');
-            api.clearAlerts(alertContainer);
 
             const result = await teamAPI.generateInviteLink('{{ team.id }}');
 
@@ -511,9 +532,9 @@
                 copyBtn.disabled = false;
                 generateBtn.innerHTML = '<ion-icon name="sparkles-outline"></ion-icon> Regenerate Link';
 
-                api.showAlert(alertContainer, 'success', data.message);
+                api.showToast(data.message, 'success');
             } else {
-                api.showAlert(alertContainer, 'danger', result.error || 'Failed to generate link');
+                api.showToast(result.error || 'Failed to generate link', 'danger');
                 api.resetButton(generateBtn);
             }
         }
@@ -523,10 +544,12 @@
             const result = await teamAPI.manageTeamPassword('{{ team.id }}', password);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to update password');
+                api.showToast(result.error || 'Failed to update password', 'danger');
             }
         };
 
@@ -538,10 +561,12 @@
             const result = await teamAPI.manageTeamPassword('{{ team.id }}', null);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to remove password');
+                api.showToast(result.error || 'Failed to remove password', 'danger');
             }
         };
 
@@ -554,10 +579,12 @@
             const result = await teamAPI.withdrawTeam(shortId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.href = '{{ url_for("main.index") }}';
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("main.index") }}';
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to withdraw team');
+                api.showToast(result.error || 'Failed to withdraw team', 'danger');
             }
         };
 
@@ -569,10 +596,12 @@
             const result = await teamAPI.unwithdrawTeam(shortId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to un-withdraw team');
+                api.showToast(result.error || 'Failed to un-withdraw team', 'danger');
             }
         };
 
@@ -585,10 +614,12 @@
             const result = await teamAPI.cancelTeam(shortId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.href = '{{ url_for("main.index") }}';
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("main.index") }}';
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to cancel team');
+                api.showToast(result.error || 'Failed to cancel team', 'danger');
             }
         };
 
@@ -600,10 +631,12 @@
             const result = await teamAPI.closeTeam(shortId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to close team');
+                api.showToast(result.error || 'Failed to close team', 'danger');
             }
         };
 
@@ -615,10 +648,12 @@
             const result = await teamAPI.reopenTeam(shortId);
 
             if (result.success) {
-                alert(result.data.message);
-                window.location.reload();
+                api.showToast(result.data.message, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                alert(result.error || 'Failed to reopen team');
+                api.showToast(result.error || 'Failed to reopen team', 'danger');
             }
         };
 
@@ -632,7 +667,7 @@
                 const password = passwordInput.value.trim();
 
                 if (!password) {
-                    alert('Please enter a password');
+                    api.showToast('Please enter a password', 'warning');
                     return;
                 }
 
@@ -654,27 +689,29 @@
                 const previousBatonSerial = previousBatonSerialInput.value.trim();
 
                 if (!estimatedDuration) {
-                    alert('Please enter an estimated duration.');
+                    api.showToast('Please enter an estimated duration.', 'warning');
                     return;
                 }
 
                 // Basic regex validation for HH:MM using shared utility
                 if (!Utils.validateTime(estimatedDuration)) {
-                    alert('Estimated duration must be in HH:MM format (e.g., 05:30 or 12:00).');
+                    api.showToast('Estimated duration must be in HH:MM format (e.g., 05:30 or 12:00).', 'warning');
                     return;
                 }
 
-                const result = await teamAPI.updateTeam('{{ team.id }}', {
+                const result = await teamAPI.updateTeamDetails('{{ team.id }}', {
                     estimated_duration: estimatedDuration,
                     comments: comments,
                     previous_baton_serial: previousBatonSerial
                 });
 
                 if (result.success) {
-                    alert(result.data.message);
-                    window.location.reload();
+                    api.showToast(result.data.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
                 } else {
-                    alert(result.error || 'Failed to update team details');
+                    api.showToast(result.error || 'Failed to update team details', 'danger');
                 }
             });
         }

@@ -23,7 +23,7 @@
                             Edit Registration
                         {% else %}
                             <ion-icon name="person-add" class="me-2"></ion-icon>
-                            Join a Team
+                            Join Team
                         {% endif %}
                     </h3>
                     {% if mode == 'view' and existing_membership %}
@@ -227,17 +227,7 @@
                             <div class="form-text">Share any scheduling constraints, preferences, or other relevant information.</div>
                         </div>
 
-                        <div class="mb-4">
-                            <div class="d-flex align-items-center">
-                                <ion-icon name="mail" class="me-2"></ion-icon>
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
-                                    <label class="form-check-label" for="email_opt_in">
-                                       Email me before the next LRR.
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
+
 
                         {% if mode != 'edit' and mode != 'view' %}
                         <div class="mb-4">
@@ -261,11 +251,22 @@
                         <input type="hidden" name="waiver_agreed" value="on">
                         {% endif %}
 
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center">
+                                <ion-icon name="mail" class="me-2"></ion-icon>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
+                                    <label class="form-check-label" for="email_opt_in">
+                                       Email me before the next LRR.
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             {% if mode == 'edit' %}
                                 {% if existing_membership and existing_membership.status == 'withdrawn' %}
                                 <button type="button" class="btn btn-success" id="unwithdraw-btn" onclick="unwithdrawMembership('{{ existing_membership.user.id }}')">
-                                    <ion-icon name="checkmark-circle" class="me-1"></ion-icon>
                                     Re-join Team
                                 </button>
                                 {% elif not is_form_disabled %}
@@ -274,18 +275,15 @@
                                         <!-- No buttons for removed users - they need to join a different team -->
                                         {% else %}
                                         <button type="button" class="btn btn-outline-warning me-md-2" onclick="withdrawMembership('{{ existing_membership.user.id }}')">
-                                            <ion-icon name="exit-outline" class="me-1"></ion-icon>
                                             Withdraw from Team
                                         </button>
                                         <button type="submit" class="btn btn-primary" id="submit-btn">
-                                            <ion-icon name="create" class="me-1"></ion-icon>
                                             Update Preferences
                                         </button>
                                         {% endif %}
                                     {% else %}
                                         {# Captain of a pending team creating their preferences for the first time #}
                                         <button type="submit" class="btn btn-primary" id="submit-btn">
-                                            <ion-icon name="save-outline" class="me-1"></ion-icon>
                                             Save Preferences
                                         </button>
                                     {% endif %}

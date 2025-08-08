@@ -15,7 +15,7 @@
                 <div class="card-header">
                     <h3 class="card-title mb-0">
                         <ion-icon name="add-circle" class="me-2"></ion-icon>
-                        Create New Team
+                        Create Team
                     </h3>
                 </div>
                 <div class="card-body">
@@ -96,14 +96,34 @@
                             </div>
                         </div>
 
-                        <div class="mb-4" id="email-opt-in-section" style="display: none;">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if current_user.email_opt_in %}checked{% endif %}{% if not current_user.is_authenticated %} disabled{% endif %}>
-                                <label class="form-check-label" for="email_opt_in">
-                                    <ion-icon name="mail-outline" class="me-1"></ion-icon>
-                                    Opt-in for information about the next event.
+
+                        <div class="mb-4" id="waiver-section" style="display: none;">
+                            <h5 class="mb-3">
+                                <ion-icon name="document-text" class="me-2"></ion-icon>
+                                Waiver and Release
+                            </h5>
+                            <div class="card bg-secondary">
+                                <div class="card-body card-text text-muted overflow-auto" style="max-height: 300px">
+                                    {% include '_waiver.html' %}
+                                </div>
+                            </div>
+                            <div class="form-check mt-3 ms-lg-4">
+                                <input class="form-check-input" type="checkbox" id="waiver_agreed" name="waiver_agreed"{% if not current_user.is_authenticated %} disabled{% endif %}>
+                                <label class="form-check-label" for="waiver_agreed">
+                                    <span class="text-danger">*</span> I have read and understood the terms and conditions of the waiver, and I agree to abide by them
                                 </label>
-                                <div class="form-text">We'll only email you about the next official running event.</div>
+                            </div>
+                        </div>
+
+                         <div id="email-opt-in-section" style="display: none;" class="mb-4">
+                            <div class="d-flex align-items-center">
+                                <ion-icon name="mail" class="me-2"></ion-icon>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
+                                    <label class="form-check-label" for="email_opt_in">
+                                       Email me before the next LRR.
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -131,6 +151,8 @@ function updateFormForFormat() {
     const teamNameHelp = document.getElementById('team-name-help');
     const passwordSection = document.getElementById('password-section');
     const emailOptInSection = document.getElementById('email-opt-in-section');
+    const waiverSection = document.getElementById('waiver-section');
+    const waiverCheckbox = document.getElementById('waiver_agreed');
 
     // Find the text node to update the label text without removing the icon
     const labelTextNode = Array.from(teamNameLabel.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
@@ -147,6 +169,9 @@ function updateFormForFormat() {
         document.getElementById('password').value = '';
         // Show email opt-in section for solo entries
         emailOptInSection.style.display = 'block';
+        // Show waiver section for solo entries
+        waiverSection.style.display = 'block';
+        waiverCheckbox.required = true;
     } else if (formatValue === 'Team') {
         // Enable team name input
         if (teamNameInput.readOnly) teamNameInput.value = ''; // Clear only if switching from Solo
@@ -158,6 +183,10 @@ function updateFormForFormat() {
         passwordSection.style.display = 'block';
         // Hide email opt-in section for team entries (they go to preferences)
         emailOptInSection.style.display = 'none';
+        // Hide waiver section for team entries (individual members sign when joining)
+        waiverSection.style.display = 'none';
+        waiverCheckbox.required = false;
+        waiverCheckbox.checked = false;
     } else {
         // Reset when no format selected
         if (teamNameInput.readOnly) teamNameInput.value = ''; // Clear only if switching from Solo
@@ -170,6 +199,10 @@ function updateFormForFormat() {
         document.getElementById('password').value = '';
         // Hide email opt-in section when no format selected
         emailOptInSection.style.display = 'none';
+        // Hide waiver section when no format selected
+        waiverSection.style.display = 'none';
+        waiverCheckbox.required = false;
+        waiverCheckbox.checked = false;
     }
 }
 
