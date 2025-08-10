@@ -30,10 +30,16 @@ class Config:
     APPLICATION_NAME = "Pantograph"
 
     # Core Flask configuration
-    SECRET_KEY = get_secret('URL_KEY')
+    SECRET_KEY = get_secret('SECRET_KEY')
+    
+    # Session security configuration
+    SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
 
     # Database configuration - use data directory for persistence
-    db_path = os.path.join(os.getcwd(), 'data', 'snappy.db')
+    db_path = os.path.join(os.getcwd(), 'data', 'pantograph.db')
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False

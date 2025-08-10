@@ -3,8 +3,8 @@ import shutil
 import re
 from flask import Blueprint, request, render_template, jsonify, redirect, url_for
 from flask_login import login_required, current_user
-from app.models import db, Team, TeamMembership
-from app.utils import load_station_names
+from app.models import db, Team, TeamMembership, TeamStatus, TeamFormat, TeamMembershipStatus
+from app.utils import load_station_names, parse_hh_mm_to_seconds, parse_mm_ss_to_seconds
 from app.config import Config
 from app.permissions import user_self_or_admin_required
 
@@ -23,19 +23,19 @@ def create_team():
 
     # Check if user is already associated with any team (as captain or member)
     existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-    existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
+    existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status=TeamMembershipStatus.ACTIVE).first()
 
-    if existing_captained_team and existing_captained_team.status not in ['withdrawn', 'cancelled']:
+    if existing_captained_team and existing_captained_team.status not in [TeamStatus.WITHDRAWN, TeamStatus.CANCELLED]:
         return jsonify({'error': f'You have already created team "{existing_captained_team.name}"'}), 400
 
-    if existing_membership and existing_membership.team.status not in ['withdrawn', 'cancelled']:
+    if existing_membership and existing_membership.team.status not in [TeamStatus.WITHDRAWN, TeamStatus.CANCELLED]:
         return jsonify({'error': f'You are already a member of team "{existing_membership.team.name}"'}), 400
 
     # Handle POST request
     try:
         team_name = request.form.get('team_name', '').strip()
-        format_type = request.form.get('format', '').strip()
-        estimated_duration = request.form.get('estimated_duration', '').strip()
+        format_type_str = request.form.get('format', '').strip()
+        estimated_duration_str = request.form.get('estimated_duration', '').strip()
         comments = request.form.get('comments', '').strip()
         password = request.form.get('password', '').strip()
         previous_baton_serial = request.form.get('previous_baton_serial', '').strip()
@@ -45,15 +45,19 @@ def create_team():
         if not team_name:
             return jsonify({'error': 'Team name is required'}), 400
 
-        if format_type not in ['Solo', 'Team']:
+        try:
+            format_type = TeamFormat(format_type_str)
+        except ValueError:
             return jsonify({'error': 'Format must be Solo or Team'}), 400
 
-        if not estimated_duration:
+        if not estimated_duration_str:
             return jsonify({'error': 'Estimated duration is required'}), 400
 
         # Validate duration format (HH:MM)
-        if not re.match(r'^\d{1,2}:\d{2}$', estimated_duration):
+        if not re.match(r'^\d{1,2}:\d{2}$', estimated_duration_str):
             return jsonify({'error': 'Duration must be in HH:MM format'}), 400
+
+        estimated_duration_seconds = parse_hh_mm_to_seconds(estimated_duration_str)
 
         # Check if team name already exists
         existing_name = Team.query.filter_by(name=team_name).first()
@@ -64,27 +68,33 @@ def create_team():
         new_team = Team(
             name=team_name,
             format=format_type,
-            estimated_duration=estimated_duration,
+            estimated_duration_seconds=estimated_duration_seconds,
             comments=comments if comments else None,
-            password=password if password else None,
             previous_baton_serial=previous_baton_serial if previous_baton_serial else None,
-            status='pending',
+            status=TeamStatus.PENDING,
             captain_id=current_user.id
         )
+        new_team.set_password(password)
 
         db.session.add(new_team)
         db.session.flush()  # Flush to get the team ID before creating membership
 
         # Always create TeamMembership for captain with standard defaults
         captain_membership = None
-        if format_type == 'Solo':
+        if format_type == TeamFormat.SOLO:
+            # Calculate planned pace for solo team based on estimated duration over 36 miles
+            # Ensure to handle division by zero if estimated_duration_seconds could be 0
+            planned_pace_seconds = 0
+            if estimated_duration_seconds > 0:
+                planned_pace_seconds = round(estimated_duration_seconds / 36)
+
             # Solo teams get reasonable defaults that can be edited later
             captain_membership = TeamMembership(
                 user_id=current_user.id,
                 team_id=new_team.id,
                 willing_to_lead=True,
                 preferred_miles=36,    # Full distance default
-                planned_pace='8:00',   # Common pace
+                planned_pace_seconds=planned_pace_seconds,
                 preferred_station=None,
                 comments=None
             )
@@ -132,22 +142,22 @@ def join_team():
             invited_team = Team.query.filter_by(invite_token=invite_token).first()
             if not invited_team:
                 error_message = "The invitation link is invalid or has expired. Please select a team from the list below."
-            elif invited_team.status != 'complete':
+            elif invited_team.status != TeamStatus.OPEN:
                 error_message = f"The team '{invited_team.name}' is not currently accepting new members."
                 invited_team = None  # Don't pre-fill if team is not open
 
-        # Get all teams with "Team" format and "complete" status (open for joining)
+        # Get all teams with "Team" format and "open" status (open for joining)
         # Exclude closed teams as they're not accepting new members
-        open_teams = Team.query.filter_by(format='Team', status='complete').all()
+        open_teams = Team.query.filter_by(format=TeamFormat.TEAM, status=TeamStatus.OPEN).all()
 
         # For authenticated users, handle existing team logic
         if current_user.is_authenticated:
             existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-            existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
+            existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status=TeamMembershipStatus.ACTIVE).first()
             pending_captain_team = None
 
             # Handle case where a captain just created a team and needs to join
-            if not invited_team and existing_captained_team and existing_captained_team.status == 'pending' and not existing_membership:
+            if not invited_team and existing_captained_team and existing_captained_team.status == TeamStatus.PENDING and not existing_membership:
                 pending_captain_team = existing_captained_team
 
             # Determine mode and setup template data
@@ -214,7 +224,7 @@ def my_registration():
                                  pending_captain_team=None)
         elif existing_captained_team:
             # If it's a solo team, they are redirected to team_members page
-            if existing_captained_team.format == 'Solo':
+            if existing_captained_team.format == TeamFormat.SOLO:
                 return redirect(url_for('teams.team_members', team_id=existing_captained_team.id))
             else:
                 # This is a 'Team' format captain who needs to fill out their preferences
@@ -229,9 +239,6 @@ def my_registration():
                                      existing_membership=None,
                                      pending_captain_team=existing_captained_team)
 
-    # Fallback (should ideally not be reached)
-    return redirect(url_for('user.join_team'))
-
     # Handle POST - delegate to shared handler
     return handle_team_registration_post(stations, mode='edit')
 
@@ -242,7 +249,7 @@ def handle_team_registration_post(stations, mode='join'):
         team_id = request.form.get('team_id')
         willing_to_lead = request.form.get('willing_to_lead') == 'yes'
         preferred_miles = request.form.get('preferred_miles')
-        planned_pace = request.form.get('planned_pace')
+        planned_pace_str = request.form.get('planned_pace')
         preferred_station = request.form.get('preferred_station')
         comments = request.form.get('comments', '').strip()
         waiver_agreed = request.form.get('waiver_agreed') == 'on'
@@ -252,7 +259,7 @@ def handle_team_registration_post(stations, mode='join'):
 
         # Check if user is already associated with any team (as captain or member)
         existing_captained_team = Team.query.filter_by(captain_id=current_user.id).first()
-        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status='active').first()
+        existing_membership = TeamMembership.query.filter_by(user_id=current_user.id, status=TeamMembershipStatus.ACTIVE).first()
 
         # Validation
         if not team_id:
@@ -273,32 +280,42 @@ def handle_team_registration_post(stations, mode='join'):
             team = db.session.get(Team, team_id)
 
         # Authorization logic: Check if user can join this specific team
-        if team.status == 'complete':
-            # For complete teams, check password if required
-            if team.password and not invite_token: # Invite token bypasses password
-                if not team_password:
-                    return jsonify({'error': 'This team requires a password'}), 400
-                if team_password != team.password:
-                    return jsonify({'error': 'Incorrect team password'}), 400
-        elif team.status == 'pending':
-            # For pending teams, only the captain can register
-            if team.captain_id != current_user.id:
-                return jsonify({'error': 'This team is pending approval and not yet open for joining.'}), 403
-        else: # 'withdrawn' or other statuses
-            return jsonify({'error': f"Team '{team.name}' is not currently accepting new members."}), 403
+        # Skip password check for edit mode when user is already a member
+        is_editing_existing_membership = mode == 'edit' and existing_membership and existing_membership.team_id == team.id
 
-        if team.format == 'Solo':
+        if not is_editing_existing_membership:
+            if team.status == TeamStatus.OPEN:
+                # For open teams, check password if required
+                if team.password_hash and not invite_token: # Invite token bypasses password
+                    if not team_password:
+                        return jsonify({'error': 'This team requires a password'}), 400
+                    if not team.check_password(team_password):
+                        return jsonify({'error': 'Incorrect team password'}), 400
+            elif team.status == TeamStatus.PENDING:
+                # For pending teams, only the captain can register
+                if team.captain_id != current_user.id:
+                    return jsonify({'error': 'This team is pending approval and not yet open for joining.'}), 403
+            else: # 'withdrawn' or other statuses
+                return jsonify({'error': f"Team '{team.name}' is not currently accepting new members."}), 403
+
+        if team.format == TeamFormat.SOLO:
             return jsonify({'error': 'Solo teams cannot be joined.'}), 400
 
         # Handle team switching (user joining different team)
         is_switching_teams = existing_membership and existing_membership.team_id != team.id
 
-        if not preferred_miles or not preferred_miles.isdigit():
+        # Validation for preferred_miles (now Numeric) and planned_pace (now seconds)
+        try:
+            preferred_miles_numeric = float(preferred_miles) # Convert to float for validation, will be stored as Numeric
+            if not (0.1 <= preferred_miles_numeric <= 36):
+                return jsonify({'error': 'Preferred miles must be a number between 0.1 and 36'}), 400
+        except ValueError:
             return jsonify({'error': 'Preferred miles must be a valid number'}), 400
 
-        # Validate pace format (mm:ss)
-        if not planned_pace or not re.match(r'^\d{1,2}:\d{2}$', planned_pace):
+        if not planned_pace_str or not re.match(r'^\d{1,2}:\d{2}$', planned_pace_str):
             return jsonify({'error': 'Planned pace must be in MM:SS format'}), 400
+
+        planned_pace_seconds = parse_mm_ss_to_seconds(planned_pace_str)
 
         if not waiver_agreed:
             return jsonify({'error': 'You must agree to the waiver terms'}), 400
@@ -311,8 +328,8 @@ def handle_team_registration_post(stations, mode='join'):
                 user_id=current_user.id,
                 team_id=team.id,
                 willing_to_lead=willing_to_lead,
-                preferred_miles=int(preferred_miles),
-                planned_pace=planned_pace,
+                preferred_miles=preferred_miles_numeric,
+                planned_pace_seconds=planned_pace_seconds,
                 preferred_station=preferred_station if preferred_station else None,
                 comments=comments if comments else None
             )
@@ -321,8 +338,8 @@ def handle_team_registration_post(stations, mode='join'):
         elif existing_membership:
             # Update existing membership
             existing_membership.willing_to_lead = willing_to_lead
-            existing_membership.preferred_miles = int(preferred_miles)
-            existing_membership.planned_pace = planned_pace
+            existing_membership.preferred_miles = preferred_miles_numeric
+            existing_membership.planned_pace_seconds = planned_pace_seconds
             existing_membership.preferred_station = preferred_station if preferred_station else None
             existing_membership.comments = comments if comments else None
             message = f'Successfully updated preferences for {team.name}'
@@ -332,8 +349,8 @@ def handle_team_registration_post(stations, mode='join'):
                 user_id=current_user.id,
                 team_id=team.id,
                 willing_to_lead=willing_to_lead,
-                preferred_miles=int(preferred_miles),
-                planned_pace=planned_pace,
+                preferred_miles=preferred_miles_numeric,
+                planned_pace_seconds=planned_pace_seconds,
                 preferred_station=preferred_station if preferred_station else None,
                 comments=comments if comments else None
             )
@@ -345,8 +362,8 @@ def handle_team_registration_post(stations, mode='join'):
                 user_id=current_user.id,
                 team_id=team.id,
                 willing_to_lead=willing_to_lead,
-                preferred_miles=int(preferred_miles),
-                planned_pace=planned_pace,
+                preferred_miles=preferred_miles_numeric,
+                planned_pace_seconds=planned_pace_seconds,
                 preferred_station=preferred_station if preferred_station else None,
                 comments=comments if comments else None
             )
@@ -379,10 +396,10 @@ def _perform_user_deletion(user_to_delete):
             # Count active team members (excluding captain)
             active_members = TeamMembership.query.filter_by(
                 team_id=team.id,
-                status='active'
+                status=TeamMembershipStatus.ACTIVE
             ).filter(TeamMembership.user_id != user_to_delete.id).count()
 
-            # If team has other active members, cannot delete captain
+            # If team has other active team members, cannot delete captain
             if active_members > 0:
                 return False, f'Cannot delete user. They are the captain of team "{team.name}" which has other active members. Please transfer captaincy first.'
 

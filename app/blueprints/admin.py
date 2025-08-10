@@ -2,9 +2,9 @@ import os
 import shutil
 from flask import Blueprint, render_template, jsonify, url_for, request
 from flask_login import current_user
-from app.models import db, User, Team, TeamMembership
+from app.models import db, User, Team, TeamMembership, TeamStatus, TeamFormat, TeamMembershipStatus
 from app.permissions import admin_required
-from app.utils import is_allowed_image
+from app.utils import is_allowed_image, format_mm_ss_from_seconds
 from app.config import Config
 
 admin = Blueprint('admin', __name__, url_prefix='/admin')
@@ -32,10 +32,10 @@ def admin_dashboard():
             'url': url_for('teams.gallery', team_id=team.id),
             'image_count': image_count,
             'format': team.format,
-            'estimated_duration': team.estimated_duration,
+            'estimated_duration': format_mm_ss_from_seconds(team.estimated_duration_seconds),
             'captain': team.captain,
             'created_at': team.created_at,
-            'member_count': len([m for m in team.memberships if m.status == 'active']),
+            'member_count': len([m for m in team.memberships if m.status == TeamMembershipStatus.ACTIVE]),
             'status': team.status,
             'comments': team.comments,
             'baton_serial': team.baton_serial
@@ -47,7 +47,7 @@ def admin_dashboard():
     users = []
     for user in db_users:
         # Get active memberships for this user
-        active_memberships = [m for m in user.memberships if m.status == 'active']
+        active_memberships = [m for m in user.memberships if m.status == TeamMembershipStatus.ACTIVE]
 
         users.append({
             'id': user.id,
@@ -108,11 +108,14 @@ def approve_team(team_id):
         if not team:
             return jsonify({'error': 'Team not found'}), 404
 
-        if team.status != 'pending':
+        if team.status != TeamStatus.PENDING:
             return jsonify({'error': 'Only pending teams can be approved'}), 400
 
-        # Update team status to complete
-        team.status = 'complete'
+        # Update team status - Solo teams go to 'closed', Team goes to 'open'
+        if team.format == TeamFormat.SOLO:
+            team.status = TeamStatus.CLOSED
+        else:
+            team.status = TeamStatus.OPEN
         db.session.commit()
 
         return jsonify({

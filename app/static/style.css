@@ -2,7 +2,12 @@
   navigation: auto;
 }
 
-.btn > ion-icon {
+html[data-bs-theme="dark"] .invert-when-dark {
+    filter: invert(1);
+}
+
+.btn > ion-icon,
+.dropdown-item > ion-icon{
   margin-bottom: -2px;
 }
 
@@ -12,4 +17,10 @@
 .form-control.disabled {
   background-color: var(--bs-secondary-bg) !important;
   opacity: 1;
+}
+
+@media (min-width: 992px) {
+  .border-lg {
+    border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
+  }
 }

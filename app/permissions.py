@@ -6,7 +6,7 @@ Provides decorators for common permission patterns.
 from functools import wraps
 from flask import abort, request
 from flask_login import current_user, login_required
-from app.models import Team, TeamMembership, User, db
+from app.models import Team, TeamMembership, User, db, TeamStatus, TeamMembershipStatus
 
 
 def admin_required(f):
@@ -154,7 +154,7 @@ def team_upload_allowed(param_name='team_id'):
                 abort(404, description="Team not found")
 
             # Check if team status allows uploads
-            if team.status in ['pending', 'withdrawn', 'cancelled']:
+            if team.status in [TeamStatus.PENDING, TeamStatus.WITHDRAWN, TeamStatus.CANCELLED]:
                 abort(403, description=f"Photo uploads are not allowed for a team with '{team.status}' status")
 
             # Check if current user has access to this team
@@ -164,7 +164,7 @@ def team_upload_allowed(param_name='team_id'):
             # Check if current user is removed from this team (captains can't be removed)
             if current_user.id != team.captain_id:
                 membership = TeamMembership.query.filter_by(user_id=current_user.id, team_id=team.id).first()
-                if not membership or membership.status in ['removed', 'withdrawn']:
+                if not membership or membership.status in [TeamMembershipStatus.REMOVED, TeamMembershipStatus.WITHDRAWN]:
                     abort(403, description="You cannot upload photos because you have been removed from this team or have withdrawn")
 
             kwargs['team'] = team
@@ -188,7 +188,7 @@ def _check_team_access(team):
 
     # Only active team members have access
     membership = TeamMembership.query.filter_by(user_id=current_user.id, team_id=team.id).first()
-    return membership is not None and membership.status != 'removed'
+    return membership is not None and membership.status != TeamMembershipStatus.REMOVED
 
 
 # Permission checker functions (for use in templates or business logic)
@@ -205,7 +205,7 @@ class PermissionChecker:
             return True
 
         membership = TeamMembership.query.filter_by(user_id=user.id, team_id=team.id).first()
-        return membership is not None and membership.status != 'removed'
+        return membership is not None and membership.status != TeamMembershipStatus.REMOVED
 
     @staticmethod
     def can_manage_team(user, team):
@@ -220,7 +220,7 @@ class PermissionChecker:
         if not user or not user.is_authenticated:
             return False
 
-        if team.status in ['pending', 'withdrawn', 'cancelled']:
+        if team.status in [TeamStatus.PENDING, TeamStatus.WITHDRAWN, TeamStatus.CANCELLED]:
             return False
 
         if not PermissionChecker.can_access_team(user, team):
@@ -229,7 +229,7 @@ class PermissionChecker:
         # Check if user is removed from team (captains can't be removed)
         if user.id != team.captain_id:
             membership = TeamMembership.query.filter_by(user_id=user.id, team_id=team.id).first()
-            if not membership or membership.status in ['removed', 'withdrawn']:
+            if not membership or membership.status in [TeamMembershipStatus.REMOVED, TeamMembershipStatus.WITHDRAWN]:
                 return False
 
         return True

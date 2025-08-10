@@ -36,27 +36,26 @@
                             <tbody>
                                 {% for team in teams %}
                                 <tr>
-                                    <td><strong>{{ team.name }}</strong>{% if team.format == 'Solo' %} <span class="text-muted">(Solo)</span>{% endif %}</td>
+                                    <td><strong>{{ team.name }}</strong>{% if team.format == TeamFormat.SOLO %} <span class="text-muted">(Solo)</span>{% endif %}</td>
                                     <td>
-                                        {% if team.status == 'pending' %}
-                                        <span class="badge bg-warning">
-                                            <ion-icon name="hourglass-outline" class="me-1"></ion-icon>Pending
+                                        {% if team.status == TeamStatus.PENDING %}
+                                        <span class="text-warning">
+                                            Pending
                                         </span>
-                                        {% elif team.status == 'complete' %}
-                                        <span class="badge bg-success">
-                                            <ion-icon name="checkmark-circle-outline" class="me-1"></ion-icon>Complete
+                                        {% elif team.status == TeamStatus.OPEN %}
+                                        <span class="text-success">Open
                                         </span>
-                                        {% elif team.status == 'withdrawn' %}
-                                        <span class="badge bg-secondary">
-                                            <ion-icon name="close-circle-outline" class="me-1"></ion-icon>Withdrawn
+                                        {% elif team.status == TeamStatus.WITHDRAWN %}
+                                        <span class="text-secondary">
+                                            Withdrawn
                                         </span>
-                                        {% elif team.status == 'cancelled' %}
-                                        <span class="badge bg-danger">
-                                            <ion-icon name="ban-outline" class="me-1"></ion-icon>Cancelled
+                                        {% elif team.status == TeamStatus.CANCELLED %}
+                                        <span class="text-danger">
+                                            Cancelled
                                         </span>
-                                        {% elif team.status == 'closed' %}
-                                        <span class="badge bg-warning">
-                                            <ion-icon name="lock-closed-outline" class="me-1"></ion-icon>Closed
+                                        {% elif team.status == TeamStatus.CLOSED %}
+                                        <span class="text-warning">
+                                            Closed
                                         </span>
                                         {% endif %}
                                     </td>
@@ -78,13 +77,15 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-info">{{ team.baton_serial or 'N/A' }}</span>
-                                        <button class="btn btn-sm btn-link" onclick="openEditBatonSerialModal('{{ team.id }}', '{{ team.name }}', '{{ team.baton_serial or '' }}')">
+                                        {{ team.baton_serial or 'N/A' }}
+                                        <button class="btn btn-link" onclick="openEditBatonSerialModal('{{ team.id }}', '{{ team.name }}', '{{ team.baton_serial or '' }}')">
                                             <ion-icon name="create-outline"></ion-icon>
                                         </button>
                                     </td>
                                     <td>
-                                        <small class="text-muted">{{ team.created_at.strftime('%m/%d/%y') }}</small>
+                                        <time datetime="{{ team.created_at.isoformat() }}Z" title="{{ team.created_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                            {{ team.created_at.strftime('%-m/%-d/%y') }}
+                                        </time>
                                     </td>
                                     <td>
                                         <div class="dropdown">
@@ -92,7 +93,7 @@
                                                 <ion-icon name="ellipsis-horizontal-outline"></ion-icon>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                {% if team.status == 'pending' %}
+                                                {% if team.status == TeamStatus.PENDING %}
                                                 <li><a class="dropdown-item text-success" href="#" onclick="approveTeam('{{ team.name }}', '{{ team.id }}')">
                                                     <ion-icon name="checkmark-outline" class="me-2"></ion-icon>Approve
                                                 </a></li>
@@ -100,7 +101,7 @@
                                                     <ion-icon name="ban-outline" class="me-2"></ion-icon>Cancel
                                                 </a></li>
                                                 {% endif %}
-                                                {% if team.status != 'withdrawn' and team.status != 'cancelled' %}
+                                                {% if team.status != TeamStatus.WITHDRAWN and team.status != TeamStatus.CANCELLED %}
                                                 <li><a class="dropdown-item text-warning" href="#" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
                                                     <ion-icon name="close-outline" class="me-2"></ion-icon>Withdraw
                                                 </a></li>
@@ -153,17 +154,12 @@
                                         <div class="d-flex align-items-center">
                                             {% if user.avatar_url %}
                                                 <img src="{{ user.avatar_url }}" alt="{{ user.name }}"
-                                                     class="rounded-circle me-3" width="40" height="40">
-                                            {% else %}
-                                                <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                     style="width: 40px; height: 40px;">
-                                                    <span class="text-white fw-bold">{{ user.name[0].upper() }}</span>
-                                                </div>
+                                                     class="rounded-circle me-3 {% if current_user.is_authenticated and user.id == current_user.id %}border border-2 border-primary-subtle{% endif %}" width="40" height="40">
                                             {% endif %}
                                             <div>
                                                 <strong>{{ user.name }}</strong>
                                                 {% if user.is_admin %}
-                                                    <span class="badge bg-danger ms-2">Admin</span>
+                                                    <span class="badge bg-secondary ms-2 rounded-pill">Admin</span>
                                                 {% endif %}
                                                 <a href="mailto:{{ user.email }}" class="link-secondary text-decoration-none d-block">
                                                     <small>{{ user.email }}</small>
@@ -177,13 +173,10 @@
                                                 <div class="mb-1">
                                                     <a href="{{ url_for('teams.team_members', team_id=membership.team.id) }}"
                                                        target="_blank" class="text-decoration-none">
-                                                        <strong>{{ membership.team.name }}</strong>
+                                                        {{ membership.team.name }} {% if membership.team.format == TeamFormat.SOLO %}(Solo){% endif %}
                                                     </a>
                                                     {% if membership.user_id == membership.team.captain_id %}
-                                                        <span class="badge bg-success ms-1">Captain</span>
-                                                    {% endif %}
-                                                    {% if membership.willing_to_lead %}
-                                                        <span class="badge bg-warning text-dark ms-1">Leg Leader</span>
+                                                        <span class="badge bg-success ms-2 rounded-pill">Captain</span>
                                                     {% endif %}
                                                 </div>
                                             {% endfor %}
@@ -192,10 +185,12 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-success">Active</span>
+                                        <span class="text-success">Active</span>
                                     </td>
                                     <td>
-                                        <small class="text-muted">{{ user.created_at.strftime('%m/%d/%y') }}</small>
+                                        <time datetime="{{ user.created_at.isoformat() }}Z" title="{{ user.created_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                            {{ user.created_at.strftime('%-m/%-d/%y') }}
+                                        </time>
                                     </td>
                                     <td>
                                         <div class="dropdown">
@@ -261,14 +256,14 @@
                     <p><strong>Team Status Workflow:</strong></p>
                     <ul>
                         <li><span class="badge bg-warning">Pending</span>: New teams await admin approval</li>
-                        <li><span class="badge bg-success">Complete</span>: Approved teams open for joining</li>
+                        <li><span class="badge bg-success">Open</span>: Approved teams open for joining</li>
                         <li><span class="badge bg-warning">Closed</span>: Teams closed to new registrations</li>
                         <li><span class="badge bg-secondary">Withdrawn</span>: Teams withdrawn from event</li>
                         <li><span class="badge bg-danger">Cancelled</span>: Permanently cancelled pending teams</li>
                     </ul>
                     <p><strong>Admin Actions:</strong></p>
                     <ul>
-                        <li><strong>Approve</strong>: Change pending teams to complete status</li>
+                        <li><strong>Approve</strong>: Change pending teams to open status</li>
                         <li><strong>Cancel</strong>: Permanently cancel pending teams</li>
                         <li><strong>Withdraw</strong>: Mark teams as withdrawn</li>
                         <li><strong>Delete</strong>: Permanently remove team and data</li>

@@ -10,33 +10,33 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
-            {% set user_membership = current_user.memberships | selectattr('status', 'equalto', 'active') | first if
+            {% set user_membership = current_user.memberships | selectattr('status', 'equalto', TeamMembershipStatus.ACTIVE) | first if
             current_user.is_authenticated and current_user.memberships else none %}
             {% set user_team = user_membership.team if user_membership else (current_user.captained_teams | first if
             current_user.is_authenticated and current_user.captained_teams else none) %}
 
             <!-- Left section: Team and navigation -->
-            <div class="navbar-nav d-flex flex-column flex-lg-row align-items-start align-items-lg-center pt-1">
+            <div class="navbar-nav d-flex flex-column flex-lg-row align-items-start align-items-lg-center pt-lg-1">
                 <!-- Team section (authenticated users with teams only) -->
                 {% if current_user.is_authenticated and user_team %}  {# OPENS: Show team section for authenticated users with teams #}
-                <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-lg-2 px-2 mx-1 border rounded mb-0 "
+                <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center p-0 m-0 gap-lg-2 px-md-2 mx-sm-1 border-lg rounded mb-0 "
                      style="border-color: #dee2e6;">
                     <!-- Team indicator -->
-                    <div class="text-secondary">
-                        <span>Team</span> <span class="fw-semibold">{{ user_team.name }}</span>
+                    <div class="text-secondary py-sm-1 py-lg-2 ">
+                        {% if user_team.format == TeamFormat.TEAM %}<span>Team</span> {% endif %}<span class="fw-semibold">{{ user_team.name }}</span>
                     </div>
 
                     <!-- Separator -->
                     <div class="vr d-none d-lg-block"></div>
 
                     <!-- Team links -->
-                    <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-1 gap-lg-2">
+                    <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-lg-2">
                         <a class="nav-link d-flex align-items-center {% if request.endpoint == 'teams.team_members' %}active fw-bold{% endif %} px-1"
                            href="{{ url_for('teams.team_members', team_id=user_team.id) }}">
                             <ion-icon
-                                    name="{% if request.endpoint == 'teams.team_members' %}{% if user_team.format == 'Solo' %}person{% else %}people{% endif %}{% else %}{% if user_team.format == 'Solo' %}person-outline{% else %}people-outline{% endif %}{% endif %}"
+                                    name="{% if request.endpoint == 'teams.team_members' %}{% if user_team.format == TeamFormat.SOLO %}person{% else %}people{% endif %}{% else %}{% if user_team.format == TeamFormat.SOLO %}person-outline{% else %}people-outline{% endif %}{% endif %}"
                                     class="me-1"></ion-icon>
-                            {% if user_team.format == 'Solo' %}Entry{% else %}Members{% endif %}
+                            {% if user_team.format == TeamFormat.SOLO %}Entry{% else %}Members{% endif %}
                         </a>
                         <a class="nav-link d-flex align-items-center {% if request.endpoint == 'teams.gallery' %}active fw-bold{% endif %} px-1"
                            href="{{ url_for('teams.gallery', team_id=user_team.id) }}">
@@ -52,7 +52,7 @@
                 <!-- Create/Join Team links (for users without teams OR unauthenticated users) -->
                 {% if not user_team %}  {# OPENS: Show Create/Join Team links for users without teams #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.create_team' %}active{% endif %} pt-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.create_team' %}active{% endif %} pt-lg-1"
                        href="{{ url_for('user.create_team') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.create_team' %}add-circle{% else %}add-circle-outline{% endif %}"
@@ -61,7 +61,7 @@
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.join_team' %}active{% endif %} pt-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.join_team' %}active{% endif %} pt-lg-1"
                        href="{{ url_for('user.join_team') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.join_team' %}person-add{% else %}person-add-outline{% endif %}"
@@ -70,9 +70,9 @@
                     </a>
                 </div>
                 <!-- My Registration link (for authenticated team members only) -->
-                {% elif current_user.is_authenticated and user_team.format == 'Team' %}  {# ELIF: Show My Registration for authenticated team members #}
+                {% elif current_user.is_authenticated and user_team.format == TeamFormat.TEAM %}  {# ELIF: Show My Registration for authenticated team members #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.my_registration' %}active fw-bold{% endif %} pt-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.my_registration' %}active fw-bold{% endif %} pt-lg-1"
                        href="{{ url_for('user.my_registration') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.my_registration' %}person{% else %}person-outline{% endif %}"
@@ -85,7 +85,7 @@
                 <!-- Admin link (authenticated admins only) -->
                 {% if current_user.is_authenticated and current_user.is_admin %}  {# OPENS: Show Admin link for admin users #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'admin.admin_dashboard' %}active{% endif %} pt-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'admin.admin_dashboard' %}active{% endif %} pt-lg-1"
                        href="{{ url_for('admin.admin_dashboard') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'admin.admin_dashboard' %}settings{% else %}settings-outline{% endif %}"
@@ -113,21 +113,21 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
-                    <li><span class="dropdown-item-text"><small class="text-muted">via {{ current_user.provider.title() }}</small></span>
+                    <li><span class="dropdown-item-text"><small class="text-muted">via {{ current_user.provider.value.title() }}</small></span>
                     </li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
                     <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
-                        <ion-icon name="log-out-outline" class="me-2"></ion-icon>
+                        <ion-icon name="log-out-outline" class=""></ion-icon>
                         Logout
                     </a></li>
                     <li>
                         <hr class="dropdown-divider">
                     </li>
                     <li><a class="dropdown-item text-danger" href="#"
-                           onclick="confirmDeleteUser('{{current_user.name}}', '{{current_user.id}}')">
-                        <ion-icon name="trash-outline" class="me-2"></ion-icon>
+                           onclick="confirmDeleteOwnAccount('{{current_user.id}}')">
+                        <ion-icon name="trash-outline" class=""></ion-icon>
                         Delete Account
                     </a></li>
                 </ul>

@@ -52,6 +52,33 @@
 import 'bootstrap';
  import { Modal } from 'bootstrap';
 
+// Global timezone conversion for all time elements
+document.addEventListener('DOMContentLoaded', function() {
+    // Convert all time elements to Pacific timezone
+    document.querySelectorAll('time[datetime]').forEach(timeEl => {
+        const utcTime = new Date(timeEl.getAttribute('datetime'));
+
+        // Update the display text to Pacific time
+        timeEl.textContent = utcTime.toLocaleDateString('en-US', {
+            timeZone: 'America/Los_Angeles',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+
+        // Update the tooltip to show full Pacific time
+        timeEl.title = utcTime.toLocaleString('en-US', {
+            timeZone: 'America/Los_Angeles',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZoneName: 'short'
+        });
+    });
+});
+
 // Import and initialize shared API client
 import { api, userAPI, configureUrls } from '{{ url_for("static", filename="js/api-client.js") }}';
 
@@ -61,6 +88,10 @@ configureUrls({
     createTeam: '{{ url_for("user.create_team") }}',
     joinTeam: '{{ url_for("user.join_team") }}',
     myRegistration: '{{ url_for("user.my_registration") }}',
+{% if team %}
+    uploadImages: '{{ url_for("teams.upload_images", team_id="__TEAM_ID__") }}',
+        deleteImage: '{{ url_for("teams.delete_image", team_id="__TEAM_ID__", image_id="__IMAGE_ID__") }}',
+{% endif %}
 
 {% if team and permissions.can_manage_team(current_user, team) %}
     // Team captain management
@@ -119,6 +150,57 @@ window.confirmDeleteUser = function(userName, userId) {
     deleteBtn.onclick = function() {
         deleteUser(userId);
     };
+}
+
+// Delete own account functions
+window.confirmDeleteOwnAccount = function(userId) {
+    // Enable delete button after 3 seconds
+    const deleteBtn = document.getElementById('confirmDeleteOwnAccountBtn');
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...';
+
+    setTimeout(() => {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete My Account';
+    }, 3000);
+
+    // Show modal
+    const modal = new Modal(document.getElementById('deleteOwnAccountModal'));
+    modal.show();
+
+    // Add click handler for delete button
+    deleteBtn.onclick = function() {
+        deleteOwnAccount(userId);
+    };
+}
+
+window.deleteOwnAccount = async function(userId) {
+    const deleteBtn = document.getElementById('confirmDeleteOwnAccountBtn');
+
+    // Show loading state
+    deleteBtn.disabled = true;
+    deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+
+    const result = await userAPI.deleteUser(userId);
+
+    if (result.success) {
+        // Show success toast
+        api.showToast('Your account has been deleted. You will be signed out shortly.', 'success');
+
+        // Hide modal
+        const modal = Modal.getInstance(document.getElementById('deleteOwnAccountModal'));
+        modal.hide();
+
+        // Redirect to home after short delay (user will be signed out)
+        api.redirectAfterDelay('/', 2000);
+    } else {
+        // Show error toast
+        api.showToast(result.error || 'Failed to delete your account', 'danger');
+
+        // Reset button
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = 'Delete My Account';
+    }
 }
 
 window.deleteUser = async function(userId) {

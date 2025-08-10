@@ -1,20 +1,45 @@
+import enum
 import secrets
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime, timezone
+from passlib.hash import argon2
 
 db = SQLAlchemy()
+
+# --- Enums for Data Integrity ---
+
+class TeamStatus(enum.Enum):
+    PENDING = 'pending'
+    OPEN = 'open'
+    CLOSED = 'closed'
+    WITHDRAWN = 'withdrawn'
+    CANCELLED = 'cancelled'
+
+class TeamFormat(enum.Enum):
+    SOLO = 'Solo'
+    TEAM = 'Team'
+
+class TeamMembershipStatus(enum.Enum):
+    ACTIVE = 'active'
+    WITHDRAWN = 'withdrawn'
+    REMOVED = 'removed'
+
+class OAuthProvider(enum.Enum):
+    GOOGLE = 'google'
+    GITHUB = 'github'
+    MICROSOFT = 'microsoft'
 
 class Team(db.Model):
     id = db.Column(db.String(8), primary_key=True, default=lambda: secrets.token_urlsafe(6))
     name = db.Column(db.String(255), unique=True, nullable=False)
     gallery_hash = db.Column(db.String(8), unique=True, nullable=False, default=lambda: secrets.token_urlsafe(6))  # Public gallery view hash
-    format = db.Column(db.String(50), nullable=False)  # 'Solo' or 'Team'
-    estimated_duration = db.Column(db.String(10), nullable=False)  # Format: 'HH:MM'
+    format = db.Column(db.Enum(TeamFormat), nullable=False)
+    estimated_duration_seconds = db.Column(db.Integer, nullable=False)  # Stored as total seconds
     comments = db.Column(db.Text, nullable=True)
-    password = db.Column(db.String(255), nullable=True)  # Optional password for joining
+    password_hash = db.Column(db.String(255), nullable=True)  # Optional password for joining
     invite_token = db.Column(db.String(32), unique=True, nullable=True) # Shareable, revocable invite token
-    status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'complete', 'withdrawn', 'cancelled', 'closed'
+    status = db.Column(db.Enum(TeamStatus), nullable=False, default=TeamStatus.PENDING)
     previous_baton_serial = db.Column(db.String(12), nullable=True)
     baton_serial = db.Column(db.String(12), nullable=True)
     captain_id = db.Column(db.String(8), db.ForeignKey('user.id'), nullable=False)
@@ -23,6 +48,24 @@ class Team(db.Model):
 
     # Relationships
     captain = db.relationship('User', foreign_keys=[captain_id], backref='captained_teams')
+
+    def set_password(self, password):
+        """Hashes and sets the team password."""
+        if password:
+            self.password_hash = argon2.hash(password)
+        else:
+            self.password_hash = None
+
+    def check_password(self, password):
+        """Verifies the team password against the stored hash."""
+        if self.password_hash is None:
+            return False  # No password is set
+        return argon2.verify(password, self.password_hash)
+
+    @property
+    def has_password(self):
+        """Returns True if the team has a password set."""
+        return self.password_hash is not None
 
     @property
     def members(self):
@@ -41,11 +84,11 @@ class TeamMembership(db.Model):
 
     # Join preferences
     willing_to_lead = db.Column(db.Boolean, nullable=False, default=False)
-    preferred_miles = db.Column(db.Integer, nullable=True)
-    planned_pace = db.Column(db.String(10), nullable=True)  # Format: 'MM:SS'
+    preferred_miles = db.Column(db.Numeric(4, 1), nullable=True)
+    planned_pace_seconds = db.Column(db.Integer, nullable=True)  # Stored as seconds per mile
     preferred_station = db.Column(db.String(255), nullable=True)
     comments = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), nullable=False, default='active')  # 'active', 'withdrawn'
+    status = db.Column(db.Enum(TeamMembershipStatus), nullable=False, default=TeamMembershipStatus.ACTIVE)
 
     joined_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -65,7 +108,7 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(255), unique=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
     avatar_url = db.Column(db.String(500), nullable=True)
-    provider = db.Column(db.String(50), nullable=False)  # 'google', 'github', or 'meta'
+    provider = db.Column(db.Enum(OAuthProvider), nullable=False)
     provider_id = db.Column(db.String(255), nullable=False)  # OAuth provider user ID
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -102,8 +145,8 @@ class Image(db.Model):
     
     # EXIF data
     capture_time = db.Column(db.DateTime, nullable=True)
-    gps_lat = db.Column(db.Float, nullable=True)
-    gps_lng = db.Column(db.Float, nullable=True)
+    gps_lat = db.Column(db.Numeric(10, 7), nullable=True)
+    gps_lng = db.Column(db.Numeric(10, 7), nullable=True)
     
     # File info
     file_size = db.Column(db.Integer, nullable=True)
@@ -114,4 +157,4 @@ class Image(db.Model):
     uploader = db.relationship('User', backref='uploaded_images')
     
     def __repr__(self):
-        return f'<Image {self.filename} by {self.uploader.name}>'
+        return f'<Image {self.filename} by {self.uploader.name}>' 

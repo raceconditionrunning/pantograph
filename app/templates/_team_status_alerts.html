@@ -1,8 +1,8 @@
 <!-- Pending Team Warning -->
-{% if team.status == 'pending' %}
+{% if team.status == TeamStatus.PENDING %}
 <div class="alert alert-warning" role="alert">
     <ion-icon name="hourglass-outline" class="me-2"></ion-icon>
-    {% if team.format == 'Solo' %}
+    {% if team.format == TeamFormat.SOLO %}
         <strong>Solo Entry Pending Approval</strong><br>
         Your solo registration is awaiting admin approval.
         <small class="text-muted d-block mt-2">You'll be notified once your entry is approved.</small>
@@ -26,7 +26,7 @@
 {% endif %}
 
 <!-- Cancelled Team Warning -->
-{% if team.status == 'cancelled' %}
+{% if team.status == TeamStatus.CANCELLED %}
 <div class="alert alert-secondary" role="alert">
     <ion-icon name="ban-outline" class="me-2"></ion-icon>
     <strong>Team Cancelled:</strong> The captain has canceled this team's registration. Please <a href="{{ url_for('user.join_team') }}">join another</a> or create a <a href="{{ url_for('user.create_team')}}">new team</a> if you'd like to participate.
@@ -34,7 +34,7 @@
 {% endif %}
 
 <!-- Withdrawn Team Warning -->
-{% if team.status == 'withdrawn' %}
+{% if team.status == TeamStatus.WITHDRAWN %}
 <div class="alert alert-secondary" role="alert">
     <ion-icon name="close-circle-outline" class="me-2"></ion-icon>
     <strong>Team Status: Withdrawn</strong> - This team has been withdrawn from the event.

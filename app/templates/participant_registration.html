@@ -11,18 +11,15 @@
 <div class="container my-4">
     {% include '_navbar.html' %}
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+        <div class="col-lg-8">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3 class="card-title mb-0 d-flex align-items-center">
                         {% if mode == 'view' %}
-                            <ion-icon name="person" class="me-2"></ion-icon>
                             View Registration
                         {% elif mode == 'edit' %}
-                            <ion-icon name="create" class="me-2"></ion-icon>
                             Edit Registration
                         {% else %}
-                            <ion-icon name="person-add" class="me-2"></ion-icon>
                             Join Team
                         {% endif %}
                     </h3>
@@ -40,41 +37,40 @@
 
                     {% if pending_captain_team %}
                     <div class="alert alert-info mb-4" role="alert">
-                        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
-                        <strong>Welcome, Captain!</strong> Please complete your preferences below to finalize your team setup.
+                        <ion-icon name="information-circle-outline" class="me-1"></ion-icon><strong>Welcome, Captain!</strong> Please complete your preferences below to finalize your team setup.
                     </div>
                     {% endif %}
 
                     {% if mode == 'preview' %}
                     <div class="alert alert-info mb-4" role="alert">
-                        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
+                        <ion-icon name="information-circle-outline" class="me-1"></ion-icon>
                         <a href="{{ url_for('auth.login') }}?next={{ url_for('user.create_team') }}" class="alert-link">Sign in</a> to join a team.
                     </div>
                     {% elif mode == 'edit' %}
-                        {% set is_form_disabled = (existing_team and existing_team.status in ['cancelled', 'withdrawn']) or (existing_membership and existing_membership.status in ['removed', 'withdrawn']) %}
+                        {% set is_form_disabled = (existing_team and existing_team.status in [TeamStatus.CANCELLED, TeamStatus.WITHDRAWN]) or (existing_membership and existing_membership.status in [TeamMembershipStatus.REMOVED, TeamMembershipStatus.WITHDRAWN]) %}
 
-                        {% if existing_team and existing_team.status == 'withdrawn' %}
+                        {% if existing_team and existing_team.status == TeamStatus.WITHDRAWN %}
                         <div class="alert alert-danger" role="alert">
                             <ion-icon name="warning" class="me-2"></ion-icon>
                             <strong>Team has been withdrawn.</strong><br>
                             The team "{{ existing_team.name }}" has been withdrawn from the event. You cannot edit your preferences or participate with this team anymore.
                             <a href="{{ url_for('user.join_team') }}" class="alert-link">Join a different team</a> to continue participating.
                         </div>
-                        {% elif existing_team and existing_team.status == 'cancelled' %}
+                        {% elif existing_team and existing_team.status == TeamStatus.CANCELLED %}
                         <div class="alert alert-danger" role="alert">
                             <ion-icon name="close-circle" class="me-2"></ion-icon>
                             <strong>Team has been cancelled.</strong><br>
                             The team "{{ existing_team.name }}" has been cancelled from the event. You cannot edit your preferences or participate with this team anymore.
                             <a href="{{ url_for('user.join_team') }}" class="alert-link">Join a different team</a> to continue participating.
                         </div>
-                        {% elif existing_membership and existing_membership.status == 'removed' %}
+                        {% elif existing_membership and existing_membership.status == TeamMembershipStatus.REMOVED %}
                         <div class="alert alert-danger" role="alert">
                             <ion-icon name="close-circle" class="me-2"></ion-icon>
                             <strong>You have been removed from this team.</strong><br>
                             The team captain has removed you from team "{{ existing_team.name }}". You cannot edit your preferences or participate with this team anymore.
                             <a href="{{ url_for('user.join_team') }}" class="alert-link">Join a different team</a> to continue participating.
                         </div>
-                        {% elif existing_membership and existing_membership.status == 'withdrawn' %}
+                        {% elif existing_membership and existing_membership.status == TeamMembershipStatus.WITHDRAWN %}
                         <div class="alert alert-warning" role="alert">
                             <ion-icon name="close-circle" class="me-2"></ion-icon>
                             <strong>Your registration has been withdrawn.</strong><br>
@@ -83,7 +79,7 @@
                         </div>
                         {% endif %}
                     {% elif mode == 'switch' %}
-                        {% if existing_membership and existing_membership.status == 'removed' %}
+                        {% if existing_membership and existing_membership.status == TeamMembershipStatus.REMOVED %}
                         <div class="alert alert-danger" role="alert">
                             <ion-icon name="warning" class="me-2"></ion-icon>
                             <strong>You have been removed from team "{{ existing_team.name }}".</strong><br>
@@ -134,16 +130,16 @@
                                     <option value="{{ pre_selected_team.id }}" selected>
                                         {{ pre_selected_team.name }}
                                         {% if pre_selected_team.captain %}(Captain: {{ pre_selected_team.captain.name }}){% endif %}
-                                        {% if pre_selected_team.password %}<ion-icon name="lock-closed" class="ms-1"></ion-icon>{% endif %}
+                                        {% if pre_selected_team.has_password %}<ion-icon name="lock-closed" class="ms-1"></ion-icon>{% endif %}
                                     </option>
                                 {% else %}
                                     <option value="">Choose a team to join...</option>
                                     {% for team in teams %}
                                         {# In 'switch' mode, the existing_team is defined but we want to show other teams #}
                                         {% if not existing_team or team.id != existing_team.id %}
-                                            <option value="{{ team.id }}" data-password-required="{{ 'true' if team.password else 'false' }}">
+                                            <option value="{{ team.id }}" data-password-required="{{ 'true' if team.has_password else 'false' }}">
                                                 {{ team.name }} (Captain: {{ team.captain.name }})
-                                                {% if team.password %}<ion-icon name="lock-closed" class="ms-1"></ion-icon>{% endif %}
+                                                {% if team.has_password %}<ion-icon name="lock-closed" class="ms-1"></ion-icon>{% endif %}
                                             </option>
                                         {% endif %}
                                     {% endfor %}
@@ -186,8 +182,8 @@
                                 What pace per mile would you run your preferred distance? <span class="text-danger">*</span>
                             </label>
                             <input type="text" class="form-control" id="planned_pace" name="planned_pace"
-                                   placeholder="7:30" pattern="^\d{1,2}:\d{2}$" required {% if (mode == 'edit' or mode == 'view') and existing_membership %}value="{{ existing_membership.planned_pace }}"{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
-                            <div class="form-text">Format: MM:SS (e.g., 7:30 for 7 minutes 30 seconds per mile). Your captain will adjust times to account for the elevation and street conditions of each leg.</div>
+                                   placeholder="09:30" pattern="^\d{1,2}:\d{2}$" required {% if (mode == 'edit' or mode == 'view') and existing_membership %}value="{{ existing_membership.planned_pace_seconds | format_mm_ss_from_seconds }}"{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
+                            <div class="form-text">Format: MM:SS (e.g., 09:30 for 9 minutes 30 seconds per mile). Your captain will adjust times to account for the elevation and street conditions of each leg.</div>
                         </div>
 
                         <div class="mb-3">
@@ -235,7 +231,7 @@
                                 <ion-icon name="document-text" class="me-2"></ion-icon>
                                 Waiver and Release
                             </h5>
-                            <div class="card bg-secondary">
+                            <div class="card">
                                 <div class="card-body card-text text-muted overflow-auto" style="max-height: 300px">
                                     {% include '_waiver.html' %}
                                 </div>
@@ -265,13 +261,13 @@
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             {% if mode == 'edit' %}
-                                {% if existing_membership and existing_membership.status == 'withdrawn' %}
+                                {% if existing_membership and existing_membership.status == TeamMembershipStatus.WITHDRAWN %}
                                 <button type="button" class="btn btn-success" id="unwithdraw-btn" onclick="unwithdrawMembership('{{ existing_membership.user.id }}')">
                                     Re-join Team
                                 </button>
                                 {% elif not is_form_disabled %}
                                     {% if existing_membership %}
-                                        {% if existing_membership.status == 'removed' %}
+                                        {% if existing_membership.status == TeamMembershipStatus.REMOVED %}
                                         <!-- No buttons for removed users - they need to join a different team -->
                                         {% else %}
                                         <button type="button" class="btn btn-outline-warning me-md-2" onclick="withdrawMembership('{{ existing_membership.user.id }}')">

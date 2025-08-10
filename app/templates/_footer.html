@@ -1,5 +1,5 @@
 <footer class="container mt-5 py-4">
-    <div class="d-flex justify-content-center gap-4">
+    <div class="d-flex flex-wrap justify-content-center gap-3 gap-lg-4">
         <a href="{{ url_for('main.terms_of_service') }}" class="text-muted text-decoration-none small">Terms of Service</a>
         <a href="{{ url_for('main.privacy_policy') }}" class="text-muted text-decoration-none small">Privacy Policy</a>
         <a href="https://www.lightrailrelay.com/" class="text-muted text-decoration-none small" target="_blank" rel="noopener noreferrer">
@@ -9,7 +9,7 @@
 </footer>
 
 
-<!-- Delete User Confirmation Modal -->
+<!-- Delete User Confirmation Modal (Admin) -->
 <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -39,6 +39,43 @@
                 <button type="button" class="btn btn-danger" id="confirmDeleteUserBtn" disabled>
                     <span class="spinner-border spinner-border-sm d-none me-2"></span>
                     Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Own Account Confirmation Modal -->
+<div class="modal fade" id="deleteOwnAccountModal" tabindex="-1" aria-labelledby="deleteOwnAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteOwnAccountModalLabel">
+                    <ion-icon name="warning-outline" class="text-danger me-2"></ion-icon>
+                    Delete Your Account
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>⚠ Warning: This action cannot be undone!</strong>
+                </div>
+                <p>You are about to permanently delete your account and all associated data.</p>
+                <p>This will:</p>
+                <ul>
+                    <li>Remove you from any teams you've joined</li>
+                    <li>Cancel any teams you're captaining</li>
+                    <li>Delete all your preferences and registration data</li>
+                    <li>Sign you out and remove your account permanently</li>
+                </ul>
+                <p>If you're having issues with your account or need help, consider <a href="mailto:lrr@nickwalker.us">contacting support</a> instead.</p>
+                <p>Are you sure you want to delete your account?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep My Account</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteOwnAccountBtn" disabled>
+                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                    Delete My Account
                 </button>
             </div>
         </div>

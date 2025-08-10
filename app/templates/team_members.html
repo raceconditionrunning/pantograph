@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     {% include '_head.html' %}
-    <title>{{ team.name }} - {% if team.format == 'Solo' %}My Entry{% else %}Team Members{% endif %} - {{ app_name }}</title>
+    <title>{{ team.name }} - {% if team.format == TeamFormat.SOLO %}My Entry{% else %}Team Members{% endif %} - {{ app_name }}</title>
 </head>
 <body>
 
@@ -12,11 +12,11 @@
         {% include '_team_status_alerts.html' %}
 
         {% set captain_has_joined = active_members | selectattr('user_id', 'equalto', team.captain_id) | list | length > 0 %}
-        <h1> {{team.name }}{% if team.type == "team" %} Members{% endif %}</h1>
+        <h1> {{team.name }}{% if team.format == TeamFormat.TEAM %} Members{% endif %}</h1>
 
         <div class="row">
             <div class="col-12">
-                {% if team.format == 'Team' %}
+                {% if team.format == TeamFormat.TEAM %}
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">Roster ({{ active_members|length + withdrawn_members|length }})</h5>
@@ -39,7 +39,7 @@
                                     {% if active_members %}
                                     <tr>
                                         <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-success px-3 py-2">
-                                            <ion-icon name="people" class="me-2"></ion-icon>Active Members ({{ active_members|length }})
+                                            Active ({{ active_members|length }})
                                         </td>
                                     </tr>
                                     {% for membership in active_members %}
@@ -48,23 +48,18 @@
                                             <div class="d-flex align-items-center">
                                                 {% if membership.user.avatar_url %}
                                                     <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3" width="40" height="40">
-                                                {% else %}
-                                                    <div class="{% if current_user.is_authenticated and membership.user_id == current_user.id %}bg-primary-subtle{% else %}bg-secondary{% endif %} rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                         style="width: 40px; height: 40px;">
-                                                        <span class="text-white fw-bold">{{ membership.user.name[0].upper() }}</span>
-                                                    </div>
+                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary-subtle{% endif %}" width="40" height="40">
                                                 {% endif %}
                                                 <div>
                                                     <strong>{{ membership.user.name }}</strong>
                                                     {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <span class="badge bg-primary ms-2">Me</span>
+                                                        <!--span class="badge bg-primary ms-2">Me</span-->
                                                     {% endif %}
                                                     {% if membership.user_id == team.captain_id %}
-                                                        <span class="badge bg-success ms-2">Captain</span>
+                                                        <span class="badge bg-success ms-2 rounded-pill">Captain</span>
                                                     {% endif %}
                                                     {% if membership.willing_to_lead %}
-                                                        <span class="badge bg-warning text-dark ms-2">Leg Leader</span>
+                                                        <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
                                                     {% endif %}
                                                     {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
@@ -79,8 +74,8 @@
                                                 {% if membership.preferred_miles %}
                                                     <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
                                                 {% endif %}
-                                                {% if membership.planned_pace %}
-                                                    <strong>Pace:</strong> {{ membership.planned_pace }}/mile<br>
+                                                {% if membership.planned_pace_seconds %}
+                                                    <strong>Pace:</strong> {{ membership.planned_pace_seconds | format_mm_ss_from_seconds }}/mi<br>
                                                 {% endif %}
                                                 {% if membership.preferred_station %}
                                                     <strong>End Station:</strong> {{ membership.preferred_station }}<br>
@@ -90,13 +85,15 @@
                                                 {% endif %}
                                                 {% if current_user.is_authenticated and membership.user_id == current_user.id %}
                                                     <a href="{{ url_for('user.my_registration') }}" class="text-primary text-decoration-none">
-                                                        <small><ion-icon name="create-outline" class="me-1"></ion-icon>Edit Preferences</small>
+                                                        <ion-icon name="create-outline" class="me-1"></ion-icon>Edit
                                                     </a>
                                                 {% endif %}
                                             </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
+                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                            </time>
                                         </td>
                                         {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
@@ -133,7 +130,7 @@
                                     {% if withdrawn_members %}
                                     <tr>
                                         <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-warning px-3 py-2">
-                                            <ion-icon name="person-remove" class="me-2"></ion-icon>Withdrawn Members ({{ withdrawn_members|length }})
+                                            Withdrawn ({{ withdrawn_members|length }})
                                         </td>
                                     </tr>
                                     {% for membership in withdrawn_members %}
@@ -142,20 +139,18 @@
                                             <div class="d-flex align-items-center">
                                                 {% if membership.user.avatar_url %}
                                                     <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3" width="40" height="40" style="opacity: 0.6;">
-                                                {% else %}
-                                                    <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                         style="width: 40px; height: 40px; opacity: 0.6;">
-                                                        <span class="text-white fw-bold">{{ membership.user.name[0].upper() }}</span>
-                                                    </div>
+                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.6;">
                                                 {% endif %}
                                                 <div>
                                                     <strong class="text-muted">{{ membership.user.name }}</strong>
                                                     {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <span class="badge bg-primary ms-2">Me</span>
+                                                        <!--span class="badge bg-primary ms-2">Me</span-->
                                                     {% endif %}
                                                     {% if membership.user_id == team.captain_id %}
-                                                        <span class="badge bg-success ms-2">Captain</span>
+                                                        <span class="badge bg-success ms-2 rounded-pill">Captain</span>
+                                                    {% endif %}
+                                                    {% if membership.willing_to_lead %}
+                                                        <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
                                                     {% endif %}
                                                     {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
@@ -182,7 +177,9 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
+                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                            </time>
                                         </td>
                                         {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
@@ -197,7 +194,7 @@
                                     {% if removed_members and (permissions.can_manage_team(current_user, team)) %}
                                     <tr>
                                         <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-danger px-3 py-2">
-                                            <ion-icon name="ban" class="me-2"></ion-icon>Removed Members ({{ removed_members|length }})
+                                            Removed ({{ removed_members|length }})
                                         </td>
                                     </tr>
                                     {% for membership in removed_members %}
@@ -206,17 +203,12 @@
                                             <div class="d-flex align-items-center">
                                                 {% if membership.user.avatar_url %}
                                                     <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3" width="40" height="40" style="opacity: 0.4;">
-                                                {% else %}
-                                                    <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                         style="width: 40px; height: 40px; opacity: 0.4;">
-                                                        <span class="text-white fw-bold">{{ membership.user.name[0].upper() }}</span>
-                                                    </div>
+                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.4;">
                                                 {% endif %}
                                                 <div>
                                                     <strong class="text-muted">{{ membership.user.name }}</strong>
                                                     {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <span class="badge bg-primary ms-2">Me</span>
+                                                        <!--span class="badge bg-primary ms-2">Me</span-->
                                                     {% endif %}
                                                     {% if permissions.can_manage_team(current_user, team) %}
                                                         <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
@@ -243,7 +235,9 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted">{{ membership.joined_at.strftime('%b %d, %Y') }}</small>
+                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                            </time>
                                         </td>
                                         {% if permissions.can_manage_team(current_user, team) %}
                                         <td>
@@ -273,7 +267,7 @@
         </div>
 
         <!-- Captain Actions Card -->
-        {% if current_user.is_captain_of(team) and team.status != 'cancelled' %}
+        {% if current_user.is_captain_of(team) and team.status != TeamStatus.CANCELLED %}
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
@@ -283,13 +277,13 @@
                         </h5>
                     </div>
                     <div class="card-body">
-                        {% if team.status not in ['withdrawn', 'cancelled'] %}
-                            {% if team.format == 'Team' %}
+                        {% if team.status not in [TeamStatus.WITHDRAWN, TeamStatus.CANCELLED] %}
+                            {% if team.format == TeamFormat.TEAM %}
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-4">
                                         <h6>Team Password</h6>
-                                        <p class="text-muted small">Control access to your team by setting or changing the password.            {% if team.password %}
+                                        <p class="text-muted small">Control access to your team by setting or changing the password.            {% if team.has_password %}
                                         <span type="button" class="btn btn-link d-inline-block px-0 text-secondary" onclick="removePassword()">
                                             <small><ion-icon name="lock-open-outline" class="me-1"></ion-icon>Remove Password</small>
                                         </span>
@@ -297,28 +291,28 @@
                                         <form id="password-form" class="mb-2">
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="team_password"
-                                                       placeholder="{% if team.password %}Enter new password{% else %}Set team password{% endif %}"
+                                                       placeholder="{% if team.has_password %}Enter new password{% else %}Set team password{% endif %}"
                                                        >
                                                 <button class="btn btn-outline-primary" type="submit">
-                                                    {% if team.password %}Update{% else %}Set{% endif %}
+                                                    {% if team.has_password %}Update{% else %}Set{% endif %}
                                                 </button>
                                             </div>
                                         </form>
 
                                     </div>
-                                        {% if team.format == 'Team' and team.status in ['complete', 'closed'] %}
+                                        {% if team.format == TeamFormat.TEAM and team.status == TeamStatus.CLOSED %}
                                     <div class="mb-4">
                                         <div class="d-flex justify-content-between align-items-start gap-3">
                                             <div>
                                                 <h6>Team Registration</h6>
-                                                {% if team.status == 'closed' %}
+                                                {% if team.status == TeamStatus.CLOSED %}
                                                 <p class="text-muted small mb-0">Your team is closed to new registrations. Click to reopen.</p>
                                                 {% else %}
                                                 <p class="text-muted small mb-0">Close your team to prevent new members from joining.</p>
                                                 {% endif %}
                                             </div>
                                             <div class="flex-shrink-0">
-                                                {% if team.status == 'closed' %}
+                                                {% if team.status == TeamStatus.CLOSED %}
                                                 <button class="btn btn-outline-success" onclick="reopenTeam('{{ team.name }}', '{{ team.id }}')">
                                                     <div class="d-flex align-items-center gap-2">
                                                         <ion-icon name="lock-open-outline"></ion-icon>
@@ -336,29 +330,30 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="mb-3{% if team.status == 'pending' %} opacity-50{% endif %}">
+                                    <div class="mb-3{% if team.status == TeamStatus.PENDING %} opacity-50{% endif %}">
                                         <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
                                             <div>
                                                 <h6>Invite Members</h6>
                                                 <p class="text-muted small mb-0">Share this unique link to allow others to join your team directly, bypassing the password.</p>
-                                                {% if team.status == 'pending' %}
+                                                <small class="text-muted d-block mt-2">Regenerating the link will invalidate the old one.</small>
+                                                {% if team.status == TeamStatus.PENDING %}
                                                 <p class="text-muted small mb-0"><em>Invite links are disabled while your team is pending approval.</em></p>
                                                 {% endif %}
                                             </div>
                                             <div class="flex-shrink-0">
-                                                <button class="btn btn-outline-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()" {% if team.status == 'pending' %}disabled{% endif %}>
+                                                <button class="btn btn-outline-primary" id="generateInviteLinkBtn" onclick="generateInviteLink()" {% if team.status == TeamStatus.PENDING %}disabled{% endif %}>
                                                     {% if team.invite_token %}Regenerate Link{% else %}Generate Link{% endif %}
                                                 </button>
                                             </div>
                                         </div>
                                         <div class="input-group mb-2">
                                             <input type="text" class="form-control" id="inviteLink"
-                                                   value="{% if team.invite_token %}{{ url_for('user.join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly {% if team.status == 'pending' %}disabled{% endif %}>
-                                            <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token or team.status == 'pending' %}disabled{% endif %}>
+                                                   value="{% if team.invite_token %}{{ url_for('user.join_team', invite_token=team.invite_token, _external=True) }}{% else %}Click 'Generate' to create a link.{% endif %}" readonly {% if team.status == TeamStatus.PENDING %}disabled{% endif %}>
+                                            <button class="btn btn-outline-secondary" type="button" id="copyInviteLinkBtn" onclick="copyInviteLink()" {% if not team.invite_token or team.status == TeamStatus.PENDING %}disabled{% endif %}>
                                                 <ion-icon name="copy-outline"></ion-icon> Copy
                                             </button>
                                         </div>
-                                        <small class="text-muted d-block mt-2">Regenerating the link will invalidate the old one.</small>
+
                                     </div>
 
 
@@ -374,19 +369,19 @@
                                         <div class="mb-3">
                                             <label for="estimated_duration_input" class="form-label">Estimated Duration</label>
                                             <input type="text" class="form-control" id="estimated_duration_input"
-                                                   placeholder="HH:MM" value="{{ team.estimated_duration }}" required pattern="^\d{1,2}:\d{2}$" title="Format: HH:MM">
+                                                   placeholder="HH:MM" value="{{ team.estimated_duration_seconds | format_hh_mm_from_seconds }}" required pattern="^\d{1,2}:\d{2}$" title="Format: HH:MM">
                                         </div>
                                         <div class="mb-3">
                                             <label for="comments_input" class="form-label">Comments</label>
                                             <textarea class="form-control" id="comments_input" rows="3"
-                                                      placeholder="Optional comments about your {% if team.format == 'Solo' %}entry{% else %}team entry{% endif %}..."
+                                                      placeholder="Optional comments about your {% if team.format == TeamFormat.SOLO %}entry{% else %}team entry{% endif %}..."
                                                       maxlength="500">{{ team.comments or '' }}</textarea>
                                             <div class="form-text">Optional comments visible to the admin</div>
                                         </div>
                                         <div class="mb-3">
                                             <label for="previous_baton_serial_input" class="form-label">Previous Baton Serial</label>
-                                            <input type="text" class="form-control" id="previous_baton_serial_input" name="previous_baton_serial" value="{{ team.previous_baton_serial or '' }}" maxlength="12" {% if team.status != 'pending' %}disabled{% endif %}>
-                                            <div class="form-text">If you have a baton from a previous year, enter its serial number here.  {% if team.status != 'pending' %}You can't change this after you've paid and your team is approved.
+                                            <input type="text" class="form-control" id="previous_baton_serial_input" name="previous_baton_serial" value="{{ team.previous_baton_serial or '' }}" maxlength="12" {% if team.status != TeamStatus.PENDING %}disabled{% endif %}>
+                                            <div class="form-text">If you have a baton from a previous year, enter its serial number here.  {% if team.status != TeamStatus.PENDING %}You can't change this after you've paid and your team is approved.
 
                                             {% endif %}</div>
 
@@ -405,29 +400,29 @@
                                 <div class="d-flex justify-content-between align-items-start gap-3">
                                     <div>
                                         <h6>Entry Management</h6>
-                                        {% if team.status == 'withdrawn' %}
-                                        <p class="text-muted small mb-0">Your {% if team.format == 'Solo' %}entry has{% else %}team has{% endif %} been withdrawn. Click to re-enter the event.</p>
-                                        {% elif team.status == 'pending' %}
-                                        <p class="text-muted small mb-0">Cancel your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} registration if you no longer wish to participate.</p>
+                                        {% if team.status == TeamStatus.WITHDRAWN %}
+                                        <p class="text-muted small mb-0">Your {% if team.format == TeamFormat.SOLO %}entry has{% else %}team has{% endif %} been withdrawn. Click to re-enter the event.</p>
+                                        {% elif team.status == TeamStatus.PENDING %}
+                                        <p class="text-muted small mb-0">Cancel your {% if team.format == TeamFormat.SOLO %}entry{% else %}team{% endif %} registration if you no longer wish to participate.</p>
                                         {% else %}
-                                        <p class="text-muted small mb-0">Withdraw your {% if team.format == 'Solo' %}entry{% else %}team{% endif %} from the event if needed.</p>
+                                        <p class="text-muted small mb-0">Withdraw your {% if team.format == TeamFormat.SOLO %}entry{% else %}team{% endif %} from the event if needed.</p>
                                         {% endif %}
                                     </div>
                                     <div class="flex-shrink-0">
-                                        {% if team.status == 'withdrawn' %}
+                                        {% if team.status == TeamStatus.WITHDRAWN %}
                                         <button class="btn btn-outline-success" onclick="unwithdrawTeam('{{ team.name }}', '{{ team.id }}')">
-                                            Un-withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                            Un-withdraw {% if team.format == TeamFormat.SOLO %}Entry{% else %}Team{% endif %}
                                         </button>
-                                        {% elif team.status == 'pending' %}
+                                        {% elif team.status == TeamStatus.PENDING %}
                                         <button class="btn btn-outline-danger" onclick="cancelTeam('{{ team.name }}', '{{ team.id }}')">
                                             <div class="d-flex align-items-center gap-2">
                                                 <ion-icon name="close-circle-outline"></ion-icon>
-                                                <span>Cancel {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}</span>
+                                                <span>Cancel {% if team.format == TeamFormat.SOLO %}Entry{% else %}Team{% endif %}</span>
                                             </div>
                                         </button>
                                         {% else %}
                                         <button class="btn btn-outline-warning" onclick="withdrawTeam('{{ team.name }}', '{{ team.id }}')">
-                                            Withdraw {% if team.format == 'Solo' %}Entry{% else %}Team{% endif %}
+                                            Withdraw {% if team.format == TeamFormat.SOLO %}Entry{% else %}Team{% endif %}
                                         </button>
                                         {% endif %}
                                     </div>

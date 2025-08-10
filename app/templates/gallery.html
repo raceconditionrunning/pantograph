@@ -35,13 +35,13 @@
 {% endif %}
 
 {% if permissions.can_upload_to_team(current_user, team) %}
-<form action="/team/{{ team_id }}/upload" method="POST" enctype="multipart/form-data" class="mb-4">
+<form id="uploadForm" action="{{ url_for('teams.upload_images', team_id=team.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
   <div class="row mt-3 mb-3 align-items-center">
     <label for="fileInput" class="col-sm-2 col-form-label">Upload Photos:</label>
     <div class="col-sm-10">
       <div class="input-group">
         <input type="file" class="form-control" id="fileInput" name="files" multiple required>
-        <button type="submit" class="btn btn-primary">Upload</button>
+        <button type="submit" class="btn btn-primary" id="uploadButton">Upload</button>
       </div>
     </div>
   </div>
@@ -50,21 +50,21 @@
 {% endif %}
 
 <div class="row">
-  {% for image, capture_time, gps_coordinates in images | sort(attribute='capture_time') %}
+  {% for image in images %}
     <div class="col-md-3 mb-3">
       <div class="card">
       <div class="d-flex justify-content-center text-bg-light spinner-container p-5 d-none" >
         <div class="spinner-border text-secondary opacity-50" role="status"><span class="visually-hidden">Loading...</span>
           </div>
       </div>
-        <img src="/uploads/{{ team_id }}/{{ image }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <img src="{{ url_for('teams_public.serve_image', team_id=team.id, filename=image.filename) }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
         <div class="card-body">
-          <h5 class="card-title">{{ image }}</h5>
+          <h5 class="card-title">{{ image.original_filename }}</h5>
           <p class="card-text">
-            <strong>Capture Time:</strong> {{ capture_time if capture_time else 'None' }}<br>
-            <strong>GPS Coordinates:</strong> {% if gps_coordinates %}<a href="https://www.google.com/maps?q={{ gps_coordinates[0]|round(6) }},{{ gps_coordinates[1]|round(6) }}" target="_blank">({{ gps_coordinates[0]|round(6) }}, {{ gps_coordinates[1]|round(6) }})</a>{% else %}None{% endif %}
+            <strong>Capture Time:</strong> {{ image.capture_time if image.capture_time else 'None' }}<br>
+            <strong>GPS Coordinates:</strong> {% if image.gps_coordinates %}<a href="https://www.google.com/maps?q={{ image.gps_coordinates[0] | float | round(6) }},{{ image.gps_coordinates[1] | float | round(6) }}" target="_blank">({{ image.gps_coordinates[0] | float | round(6) }}, {{ image.gps_coordinates[1] | float | round(6) }})</a>{% else %}None{% endif %}
           </p>
-          <button class="btn btn-danger delete-button" data-filename="{{ image }}" data-hash="{{ team_id }}">Delete</button>
+          <button class="btn btn-danger delete-button" data-image-id="{{ image.id }}" data-filename="{{ image.original_filename }}">Delete</button>
         </div>
       </div>
     </div>
@@ -145,19 +145,20 @@ const map = new maplibregl.Map({
 
 // Array to store images with GPS coordinates from the backend
 const imagesWithCoordinates = [
-  {% for image, capture_time, gps_coordinates in images %}
-    {% if gps_coordinates %}
+  {% for image in images %}
+    {% if image.gps_coordinates %}
       {
-        image: '{{ image }}',
-        lat: {{ gps_coordinates[0] }},
-        lng: {{ gps_coordinates[1] }}
+        imageUrl: '{{ url_for("teams_public.serve_image", team_id=team.id, filename=image.filename) }}',
+        filename: '{{ image.original_filename }}',
+        lat: {{ image.gps_coordinates[0] | float }},
+        lng: {{ image.gps_coordinates[1] | float }}
       },
     {% endif %}
   {% endfor %}
 ];
 
 // Add markers to the map for each image with GPS coordinates
-imagesWithCoordinates.forEach(({ image, lat, lng }) => {
+imagesWithCoordinates.forEach(({ imageUrl, filename, lat, lng }) => {
     // Create a DOM element for each marker
     const el = document.createElement('div');
     el.className = 'marker';
@@ -170,18 +171,56 @@ imagesWithCoordinates.forEach(({ image, lat, lng }) => {
     new maplibregl.Marker(el)
         .setLngLat([lng, lat])
         .setPopup(new maplibregl.Popup({ offset: 25 }) // Add popups
-            .setHTML(`<strong>Image:</strong><br><img src="/uploads/{{ team_id }}/${image}" style="width: 100px; height: auto;">`))
+            .setHTML(`<strong>Image:</strong> ${filename}<br><img src="${imageUrl}" style="width: 100px; height: auto;">`))
         .addTo(map);
 });
 
 // Import shared API client
-import { imageAPI, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
+import { imageAPI, Utils, api } from '{{ url_for("static", filename="js/api-client.js") }}';
+
+// Handle upload form submission
+const uploadForm = document.getElementById('uploadForm');
+if (uploadForm) {
+  uploadForm.addEventListener('submit', async function(event) {
+    event.preventDefault(); // Prevent default form submission
+    
+    const formData = new FormData(uploadForm);
+    const uploadButton = document.getElementById('uploadButton');
+    const teamId = '{{ team.id }}';
+    
+    // Show loading state
+    api.setButtonLoading(uploadButton, 'Uploading...');
+    
+    try {
+      const result = await imageAPI.uploadImages(teamId, formData);
+      
+      if (result.success) {
+        const uploadCount = result.data.images ? result.data.images.length : 0;
+        api.showToast(`${uploadCount} images uploaded successfully!`, 'success');
+        
+        // Refresh the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        api.showToast(result.error || 'Upload failed', 'danger');
+      }
+    } catch (error) {
+      api.showToast('Upload failed: ' + error.message, 'danger');
+    } finally {
+      api.resetButton(uploadButton);
+    }
+  });
+}
 
 document.querySelectorAll('.delete-button').forEach(button => {
   button.addEventListener('click', async function() {
     const filename = this.getAttribute('data-filename');
+    const imageId = this.getAttribute('data-image-id');
+    const teamId = '{{ team.id }}';
+    
     if (confirm(`Are you sure you want to delete ${filename}?`)) {
-      const result = await imageAPI.deleteImage(filename);
+      const result = await imageAPI.deleteImage(teamId, imageId);
 
       if (result.success) {
         this.closest('.col-md-3').remove();  // Remove the card from the UI

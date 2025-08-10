@@ -8,32 +8,46 @@
 <div class="container my-4">
     {% include '_navbar.html' %}
 
-    <h1>Privacy Policy</h1>
-    <p class="lead"> This statement explains the personal data this application processes, how it processes it, and for what purposes.</p>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-5">
+                    <h1 class="h2">Privacy Policy</h1>
+                    <p class="lead"> This statement explains the personal data this application processes, how it processes it, and for what purposes.</p>
 
-    <h2>Personal Data We Collect</h2>
-    <p>The data we collect:</p>
-    <ul>
-        <li><strong>Profile Information:</strong> When you sign in using an OAuth provider (like Google or GitHub), we receive your <b>name</b>, <b>email address</b>, and <b>profile picture URL</b> from that provider. We store this information to manage your account.</li>
-        <li><strong>Team and Registration Data:</strong> When you create or join a team, we collect the information you provide, such as team name, your running preferences (pace, distance), and any comments you add.</li>
-        <li><strong>Uploaded Content:</strong> We collect the <b>photos you upload</b>, including any <b>EXIF metadata</b> embedded within them, such as capture time and GPS coordinates.</li>
-    </ul>
+                    <section>
+                        <h2 class="h4">Personal Data We Collect</h2>
+                        <ul>
+                            <li><strong>Profile Information:</strong> When you sign in using an OAuth provider (like Google or GitHub), we receive your <b>name</b>, <b>email address</b>, and <b>profile picture URL</b> from that provider. We store this information to manage your account.</li>
+                            <li><strong>Team and Registration Data:</strong> When you create or join a team, we collect the information you provide, such as team name, your running preferences (pace, distance), and any comments you add.</li>
+                            <li><strong>Uploaded Content:</strong> We collect the <b>photos you upload</b>, including any <b>EXIF metadata</b> embedded within them, such as capture time and GPS coordinates.</li>
+                        </ul>
+                    </section>
 
-    <h2>How We Use Personal Data</h2>
-    <p>This application uses the data for two basic purposes: to facilitate team discovery and coordination, and to send communications.
+                    <section>
+                        <h2 class="h4">How We Use Personal Data</h2>
+                        <p>This application uses the data for two basic purposes: to facilitate team discovery and coordination, and to send communications.</p>
 
-    <ul>
-    <li>Profile Information: Your name and profile image are visible to your teammates.</li>
-    <li>Email: Your email is visible to your team captain. We may send you emails about this year's event at the email address associated with your account. Only with your explicit permission will we use the address to inform you about future events.</li>
-    <li>Uploaded Content: Images you upload are visible to your teammates. If your team shares the secret gallery link, they can be browsed by users without accounts.</li>
-</ul>
+                        <ul>
+                            <li>Profile Information: Your name and profile image are visible to your teammates.</li>
+                            <li>Email: Your email is visible to your team captain. We may send you emails about this year's event at the email address associated with your account. Only with your explicit permission will we use the address to inform you about future events.</li>
+                            <li>Uploaded Content: Images you upload are visible to your teammates. If your team shares the secret gallery link, they can be browsed by users without accounts.</li>
+                        </ul>
+                    </section>
 
-    <h2>Sharing of Personal Data</h2>
-    <p>We do not share your personal data with third parties except as required by law.</p>
+                    <section>
+                        <h2 class="h4">Sharing of Personal Data</h2>
+                        <p>We do not share your personal data with third parties except as required by law.</p>
+                    </section>
 
-    <h2>Data Deletion</h2>
-    <p>You can delete your account at any time from your user profile dropdown. Deleting your account will permanently remove all your personal data, including your user profile, team memberships, and any teams you captain (if they have no other members).</p>
-
+                    <section>
+                        <h2 class="h4">Data Deletion</h2>
+                        <p>You can delete your account at any time from your user profile dropdown. Deleting your account will permanently remove all your personal data, including your user profile, team memberships, and any teams you captain (if they have no other members).</p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% include '_footer.html' %}
 </body>

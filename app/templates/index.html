@@ -10,24 +10,24 @@
 <div class="container my-4">
     {% include '_navbar.html' %}
     <div class="row justify-content-center">
-        <div class="col-8 col-lg-6">
+        <div class="col-md-6 ">
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h2 class="card-title">Pantograph</h2>
                     <p>Register for <a href="https://lightrailrelay.com">Light Rail Relay</a> by creating or joining a team. Upload exchange photos for timing.</p>
                     <hr>
                     {% if current_user.is_authenticated %}
-                        {% set user_membership = current_user.memberships | selectattr('status', 'equalto', 'active') | first if current_user.memberships else none %}
+                        {% set user_membership = current_user.memberships | selectattr('status', 'equalto', TeamMembershipStatus.ACTIVE) | first if current_user.memberships else none %}
                         {% set user_team = user_membership.team if user_membership else current_user.captained_teams | first if current_user.captained_teams else none %}
 
                         {% if user_team %}
-                            <p>Welcome back!</p>
+                            <p>Welcome back! Check on your team:</p>
                     <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
                             <a href="{{ url_for('teams.team_members', team_id=user_team.id) }}" class="btn btn-primary btn-lg mx-1">
-                                {% if user_team.format == 'Solo' %}
+                                {% if user_team.format == TeamFormat.SOLO %}
                                     <ion-icon name="person-outline" class="me-1"></ion-icon> Entry
                                 {% else %}
-                                    <ion-icon name="people-outline" class="me-1"></ion-icon> Team Members
+                                    <ion-icon name="people-outline" class="me-1"></ion-icon> Members
                                 {% endif %}
                             </a>
 

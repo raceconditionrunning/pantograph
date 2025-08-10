@@ -6,13 +6,14 @@ from datetime import datetime
 from flask import Blueprint, request, redirect, render_template, send_from_directory, jsonify, abort, url_for
 from flask_login import current_user
 from werkzeug.utils import secure_filename
-from app.models import db, Team, TeamMembership
+from app.models import db, Team, TeamMembership, TeamStatus, TeamMembershipStatus
 from app.permissions import (
     team_access_required, team_captain_required,
     team_captain_or_member_required, team_upload_allowed
 )
-from app.utils import get_exif_data, is_allowed_image, find_team_by_id, find_team_by_gallery_hash, load_station_names
+from app.utils import get_exif_data, is_allowed_image, validate_image_content, secure_filename_enhanced, find_team_by_id, find_team_by_gallery_hash, load_station_names, parse_hh_mm_to_seconds, convert_heic_to_jpeg, is_heic_file
 from app.config import Config
+from app.security import limiter
 
 teams = Blueprint('teams', __name__, url_prefix='/team')
 
@@ -106,9 +107,9 @@ def team_members(team_id, team):
     all_memberships = TeamMembership.query.filter_by(team_id=team.id).all()
 
     # Filter memberships by status
-    active_members = [m for m in all_memberships if m.status == 'active']
-    withdrawn_members = [m for m in all_memberships if m.status == 'withdrawn']
-    removed_members = [m for m in all_memberships if m.status == 'removed']
+    active_members = [m for m in all_memberships if m.status == TeamMembershipStatus.ACTIVE]
+    withdrawn_members = [m for m in all_memberships if m.status == TeamMembershipStatus.WITHDRAWN]
+    removed_members = [m for m in all_memberships if m.status == TeamMembershipStatus.REMOVED]
 
     # Calculate statistics from active members only
     willing_leaders_count = sum(1 for membership in active_members if membership.willing_to_lead)
@@ -142,10 +143,21 @@ def delete_image(team_id, image_id, team):
             image.uploaded_by == current_user.id):
         return jsonify({"error": "Permission denied"}), 403
 
-    # Delete the physical file
+    # Delete the physical file(s)
     file_path = os.path.join(Config.UPLOAD_FOLDER, image.file_path)
     if os.path.exists(file_path):
         os.remove(file_path)
+    
+    # If this was a converted HEIC file, also delete the original HEIC file
+    if file_path.lower().endswith('.jpg'):
+        # Check if there's a corresponding HEIC file with the same timestamp
+        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        team_dir = os.path.dirname(file_path)
+        for ext in ['.heic', '.heif']:
+            heic_path = os.path.join(team_dir, base_filename + ext)
+            if os.path.exists(heic_path):
+                os.remove(heic_path)
+                break
 
     # Delete the database record
     db.session.delete(image)
@@ -158,6 +170,7 @@ def delete_image(team_id, image_id, team):
 
 
 @teams.route('/<team_id>/images', methods=['POST'])
+@limiter.limit("15 per minute")
 @team_upload_allowed()
 def upload_images(team_id, team):
     """Upload images with database tracking"""
@@ -189,9 +202,13 @@ def upload_images(team_id, team):
 
         if not is_allowed_image(file.filename):
             continue
+            
+        # Validate file content using magic numbers
+        if not validate_image_content(file_content):
+            return jsonify({"error": f"Invalid image file: {file.filename}"}), 400
 
-        # Compute hash of the file to check for duplicates
-        file_hash = hashlib.md5(file_content).hexdigest()
+        # Compute hash of the file to check for duplicates using SHA-256 (more secure than MD5)
+        file_hash = hashlib.sha256(file_content).hexdigest()
 
         # Check for duplicate files in database
         existing_image = Image.query.join(Image.team).filter(
@@ -203,7 +220,7 @@ def upload_images(team_id, team):
             img_path = os.path.join(Config.UPLOAD_FOLDER, img.file_path)
             if os.path.exists(img_path):
                 with open(img_path, 'rb') as f:
-                    existing_file_hash = hashlib.md5(f.read()).hexdigest()
+                    existing_file_hash = hashlib.sha256(f.read()).hexdigest()
                     if file_hash == existing_file_hash:
                         is_duplicate = True
                         break
@@ -211,9 +228,9 @@ def upload_images(team_id, team):
         if is_duplicate:
             continue  # Skip saving this file as it is a duplicate
 
-        # Generate unique filename
+        # Generate unique filename with enhanced security
         timestamp = int(time.time())
-        safe_filename = secure_filename(file.filename)
+        safe_filename = secure_filename_enhanced(file.filename)
         stored_filename = f"{timestamp}_{safe_filename}"
         file_path = os.path.join(save_path, stored_filename)
 
@@ -221,22 +238,38 @@ def upload_images(team_id, team):
         with open(file_path, 'wb') as f:
             f.write(file_content)
 
-        # Extract EXIF data
-        capture_time_str, gps_coordinates = get_exif_data(file_path)
+        # Convert HEIC to JPEG if needed
+        final_file_path = file_path
+        final_stored_filename = stored_filename
+        
+        if is_heic_file(file.filename):
+            # Generate JPEG version filename
+            jpeg_filename = os.path.splitext(stored_filename)[0] + '.jpg'
+            jpeg_file_path = os.path.join(save_path, jpeg_filename)
+            
+            # Convert HEIC to JPEG
+            if convert_heic_to_jpeg(file_path, jpeg_file_path):
+                # Use JPEG version for serving
+                final_file_path = jpeg_file_path
+                final_stored_filename = jpeg_filename
+                # Keep both files - original HEIC for preservation, JPEG for serving
+
+        # Extract EXIF data (from the final file for display)
+        capture_time_str, gps_coordinates = get_exif_data(final_file_path)
         capture_time = parse_exif_datetime(capture_time_str)
         gps_lat, gps_lng = gps_coordinates if gps_coordinates else (None, None)
 
-        # Create Image record
+        # Create Image record (use final filename for serving)
         image = Image(
             filename=file.filename,
-            file_path=os.path.join(team.id, stored_filename),
+            file_path=os.path.join(team.id, final_stored_filename),
             team_id=team.id,
             uploaded_by=current_user.id,
             capture_time=capture_time,
             gps_lat=gps_lat,
             gps_lng=gps_lng,
             file_size=len(file_content),
-            mime_type=get_mime_type(file.filename)
+            mime_type=get_mime_type(final_stored_filename if is_heic_file(file.filename) else file.filename)
         )
 
         db.session.add(image)
@@ -256,7 +289,7 @@ def upload_images(team_id, team):
     })
 
 
-@teams_public.route('/<team_id>/images/<filename>')
+@teams_public.route('/teams/<team_id>/images/<filename>')
 def serve_image(team_id, filename):
     if not is_allowed_image(filename):
         return abort(404, description="Invalid file type.")
@@ -265,6 +298,37 @@ def serve_image(team_id, filename):
     team = find_team_by_id(team_id)
     if not team:
         return abort(404, description="Invalid team URL.")
+    
+    # Check if user has access to this team's images
+    # Allow access if: authenticated user with team access OR public gallery access
+    has_access = False
+    
+    if current_user.is_authenticated:
+        # Check if user has team access (member, captain, or admin)
+        from app.permissions import PermissionChecker
+        has_access = PermissionChecker.can_access_team(current_user, team)
+    
+    # If no authenticated access, check if this is a public gallery request
+    # Public gallery access is allowed via gallery_hash in referrer
+    if not has_access:
+        referrer = request.referrer
+        if referrer and f"/gallery/{team.gallery_hash}" in referrer:
+            has_access = True
+    
+    if not has_access:
+        return abort(403, description="Access denied to team images.")
+
+    # Verify the image actually belongs to this team
+    from app.models import Image
+    
+    # Look for image where the file_path matches the requested filename within the team's directory
+    image = Image.query.filter_by(
+        team_id=team.id,
+        file_path=os.path.join(team.id, secure_filename(filename))
+    ).first()
+    
+    if not image:
+        return abort(404, description="Image not found.")
 
     return send_from_directory(os.path.join(Config.UPLOAD_FOLDER, team.id), secure_filename(filename))
 
@@ -272,16 +336,17 @@ def serve_image(team_id, filename):
 @teams.route('/<team_id>/withdraw', methods=['POST'])
 @team_captain_required()
 def withdraw_team(team_id, team):
-    if team.status == 'withdrawn':
+    if team.status == TeamStatus.WITHDRAWN:
         return jsonify({'error': 'Team is already withdrawn'}), 400
 
-    if team.status != 'complete':
-        return jsonify({'error': 'Only complete teams can be withdrawn'}), 400
+    if team.status not in [TeamStatus.OPEN, TeamStatus.CLOSED]:
+        return jsonify({f'error': team.status.value + ' teams can\'t be withdrawn'}), 400
 
     try:
         # Update team status to withdrawn
-        team.status = 'withdrawn'
+        team.status = TeamStatus.WITHDRAWN
         db.session.commit()
+
 
         return jsonify({
             'success': True,
@@ -296,12 +361,12 @@ def withdraw_team(team_id, team):
 @teams.route('/<team_id>/unwithdraw', methods=['POST'])
 @team_captain_required()
 def unwithdraw_team(team_id, team):
-    if team.status != 'withdrawn':
+    if team.status != TeamStatus.WITHDRAWN:
         return jsonify({'error': 'Team is not withdrawn'}), 400
 
     try:
-        # Update team status back to complete
-        team.status = 'complete'
+        # Update team status back to open
+        team.status = TeamStatus.OPEN
         db.session.commit()
 
         return jsonify({
@@ -317,15 +382,15 @@ def unwithdraw_team(team_id, team):
 @teams.route('/<team_id>/cancel', methods=['POST'])
 @team_captain_required()
 def cancel_team(team_id, team):
-    if team.status != 'pending':
+    if team.status != TeamStatus.PENDING:
         return jsonify({'error': 'Only pending teams can be cancelled'}), 400
 
-    if team.status == 'cancelled':
+    if team.status == TeamStatus.CANCELLED:
         return jsonify({'error': 'Team is already cancelled'}), 400
 
     try:
         # Update team status to cancelled
-        team.status = 'cancelled'
+        team.status = TeamStatus.CANCELLED
         db.session.commit()
 
         return jsonify({
@@ -341,15 +406,15 @@ def cancel_team(team_id, team):
 @teams.route('/<team_id>/close', methods=['POST'])
 @team_captain_required()
 def close_team(team_id, team):
-    if team.status != 'complete':
-        return jsonify({'error': 'Only complete teams can be closed'}), 400
+    if team.status != TeamStatus.OPEN:
+        return jsonify({'error': 'Only open teams can be closed'}), 400
 
-    if team.status == 'closed':
+    if team.status == TeamStatus.CLOSED:
         return jsonify({'error': 'Team is already closed'}), 400
 
     try:
         # Update team status to closed
-        team.status = 'closed'
+        team.status = TeamStatus.CLOSED
         db.session.commit()
 
         return jsonify({
@@ -365,12 +430,12 @@ def close_team(team_id, team):
 @teams.route('/<team_id>/reopen', methods=['POST'])
 @team_captain_required()
 def reopen_team(team_id, team):
-    if team.status != 'closed':
+    if team.status != TeamStatus.CLOSED:
         return jsonify({'error': 'Team is not closed'}), 400
 
     try:
-        # Update team status back to complete
-        team.status = 'complete'
+        # Update team status back to open
+        team.status = TeamStatus.OPEN
         db.session.commit()
 
         return jsonify({
@@ -408,11 +473,11 @@ def view_member(team_id, team, user_id):
 @team_captain_or_member_required()
 def withdraw_membership(team_id, user_id, team, membership):
     try:
-        if membership.status == 'withdrawn':
+        if membership.status == TeamMembershipStatus.WITHDRAWN:
             return jsonify({'error': 'Membership is already withdrawn'}), 400
 
         # Update membership status to withdrawn
-        membership.status = 'withdrawn'
+        membership.status = TeamMembershipStatus.WITHDRAWN
         db.session.commit()
 
         return jsonify({
@@ -429,11 +494,11 @@ def withdraw_membership(team_id, user_id, team, membership):
 @team_captain_or_member_required()
 def unwithdraw_membership(team_id, user_id, team, membership):
     try:
-        if membership.status != 'withdrawn':
+        if membership.status != TeamMembershipStatus.WITHDRAWN:
             return jsonify({'error': 'Membership is not withdrawn'}), 400
 
         # Update membership status to active
-        membership.status = 'active'
+        membership.status = TeamMembershipStatus.ACTIVE
         db.session.commit()
 
         return jsonify({
@@ -460,7 +525,7 @@ def remove_member(team_id, membership_id, team):
             return jsonify({'error': 'Cannot remove team captain'}), 400
 
         # Update membership status to removed
-        membership.status = 'removed'
+        membership.status = TeamMembershipStatus.REMOVED
         db.session.commit()
 
         return jsonify({
@@ -487,7 +552,7 @@ def transfer_captain(team_id, user_id, team):
         membership = TeamMembership.query.filter_by(
             team_id=team.id,
             user_id=user_id,
-            status='active'
+            status=TeamMembershipStatus.ACTIVE
         ).first()
 
         if not membership:
@@ -514,28 +579,28 @@ def update_team_details(team_id, team):
     Allows the team captain to update team details like estimated duration.
     """
     try:
-        if team.status in ['withdrawn', 'cancelled']:
-            return jsonify({'error': f'Cannot update details for a {team.status} team.'}), 403
+        if team.status in [TeamStatus.WITHDRAWN, TeamStatus.CANCELLED]:
+            return jsonify({'error': f'Cannot update details for a {team.status.value} team.'}), 403
 
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Request data is required'}), 400
 
-        estimated_duration = data.get('estimated_duration', '').strip()
+        estimated_duration_str = data.get('estimated_duration', '').strip()
         comments = data.get('comments', '').strip()
         has_baton = data.get('has_baton') == True
 
         # Validation
-        if not estimated_duration:
+        if not estimated_duration_str:
             return jsonify({'error': 'Estimated duration is required'}), 400
 
         import re
-        if not re.match(r'^\d{1,2}:\d{2}$', estimated_duration):
+        if not re.match(r'^\d{1,2}:\d{2}$', estimated_duration_str):
             return jsonify({'error': 'Duration must be in HH:MM format (e.g., 05:30 or 12:00)'}), 400
 
-        team.estimated_duration = estimated_duration
+        team.estimated_duration_seconds = parse_hh_mm_to_seconds(estimated_duration_str)
         team.comments = comments if comments else None
-        if team.status == 'pending':
+        if team.status == TeamStatus.PENDING:
             team.has_baton = has_baton
         db.session.commit()
 
@@ -559,11 +624,11 @@ def manage_team_password(team_id, team):
 
         if password:
             # Update team password
-            team.password = password
+            team.set_password(password)
             message = 'Team password updated successfully'
         else:
             # Remove team password
-            team.password = None
+            team.set_password(None)
             message = 'Team password removed successfully'
 
         db.session.commit()
