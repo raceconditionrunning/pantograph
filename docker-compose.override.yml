@@ -2,9 +2,9 @@
 # This file is automatically used by `docker compose up`
 # Disable with: docker compose -f docker-compose.yml up
 services:
-  relay-photo-collector:
+  pantograph:
     volumes:
-      - "./app.py:/app/app.py"
+      - "./wsgi.py:/app/wsgi.py"
       - "./app:/app/app"
       - "./scripts:/app/scripts"
       - "./requirements.txt:/app/requirements.txt"
@@ -13,4 +13,6 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
-    command: ["python", "app.py"]
+      - GITHUB_CLIENT_ID=Iv23li42q1gT2odOMIpb
+      - GITHUB_CLIENT_SECRET=0b3efcd8388466255669c89f4ff6fc67ad99825b
+    command: ["uv", "run", "python", "wsgi.py"]

@@ -1,0 +1,18 @@
+[project]
+name = "pantograph"
+version = "0.1.0"
+description = "Relay event registration and photo collection platform"
+requires-python = ">=3.13"
+dependencies = [
+    "flask",
+    "flask-sqlalchemy",
+    "flask-login",
+    "flask-limiter",
+    "authlib",
+    "requests",
+    "gunicorn",
+    "haversine",
+    "pillow",
+    "pillow-heif",
+    "passlib[argon2]",
+]

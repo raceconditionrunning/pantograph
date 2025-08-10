@@ -1,3 +1,4 @@
 uploads/**/*
-snappy.db
+pantograph.db
 .env
+.venv

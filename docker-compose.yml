@@ -1,8 +1,8 @@
 services:
-  relay-photo-collector:
+  pantograph:
+    image: pantograph:latest
     env_file:
       - .env
-    container_name: relay-photo-collector
     build: .
     volumes:
       - "./uploads:/app/uploads"
