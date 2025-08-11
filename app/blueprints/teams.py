@@ -1,8 +1,9 @@
+import logging
 import os
 import time
 import hashlib
 import secrets
-from datetime import datetime
+
 from flask import Blueprint, request, redirect, render_template, send_from_directory, jsonify, abort, url_for
 from flask_login import current_user
 from werkzeug.utils import secure_filename
@@ -11,7 +12,7 @@ from app.permissions import (
     team_access_required, team_captain_required,
     team_captain_or_member_required, team_upload_allowed
 )
-from app.utils import get_exif_data, is_allowed_image, validate_image_content, secure_filename_enhanced, find_team_by_id, find_team_by_gallery_hash, load_station_names, parse_hh_mm_to_seconds, convert_heic_to_jpeg, is_heic_file
+from app.utils import is_allowed_image, validate_image_content, secure_filename_enhanced, find_team_by_id, find_team_by_gallery_hash, load_station_names, parse_hh_mm_to_seconds, convert_heic_to_jpeg, is_heic_file
 from app.config import Config
 from app.security import limiter
 
@@ -147,7 +148,7 @@ def delete_image(team_id, image_id, team):
     file_path = os.path.join(Config.UPLOAD_FOLDER, image.file_path)
     if os.path.exists(file_path):
         os.remove(file_path)
-    
+
     # If this was a converted HEIC file, also delete the original HEIC file
     if file_path.lower().endswith('.jpg'):
         # Check if there's a corresponding HEIC file with the same timestamp
@@ -175,7 +176,7 @@ def delete_image(team_id, image_id, team):
 def upload_images(team_id, team):
     """Upload images with database tracking"""
     from app.models import Image
-    from app.utils import get_exif_data, parse_exif_datetime, get_mime_type
+    from app.utils import get_exif_data, get_capture_time, get_gps_data, get_mime_type
 
     # Check existing image count from database
     existing_images_count = Image.query.filter_by(team_id=team.id).count()
@@ -202,7 +203,7 @@ def upload_images(team_id, team):
 
         if not is_allowed_image(file.filename):
             continue
-            
+
         # Validate file content using magic numbers
         if not validate_image_content(file_content):
             return jsonify({"error": f"Invalid image file: {file.filename}"}), 400
@@ -228,7 +229,6 @@ def upload_images(team_id, team):
         if is_duplicate:
             continue  # Skip saving this file as it is a duplicate
 
-        # Generate unique filename with enhanced security
         timestamp = int(time.time())
         safe_filename = secure_filename_enhanced(file.filename)
         stored_filename = f"{timestamp}_{safe_filename}"
@@ -241,28 +241,32 @@ def upload_images(team_id, team):
         # Convert HEIC to JPEG if needed
         final_file_path = file_path
         final_stored_filename = stored_filename
-        
+
         if is_heic_file(file.filename):
             # Generate JPEG version filename
             jpeg_filename = os.path.splitext(stored_filename)[0] + '.jpg'
             jpeg_file_path = os.path.join(save_path, jpeg_filename)
-            
+
             # Convert HEIC to JPEG
             if convert_heic_to_jpeg(file_path, jpeg_file_path):
                 # Use JPEG version for serving
-                final_file_path = jpeg_file_path
+                final_file_path = os.path.join(save_path, stored_filename)
                 final_stored_filename = jpeg_filename
                 # Keep both files - original HEIC for preservation, JPEG for serving
 
         # Extract EXIF data (from the final file for display)
-        capture_time_str, gps_coordinates = get_exif_data(final_file_path)
-        capture_time = parse_exif_datetime(capture_time_str)
+        exif_data = get_exif_data(final_file_path)
+        capture_time = get_capture_time(exif_data)
+        gps_coordinates = get_gps_data(exif_data)
         gps_lat, gps_lng = gps_coordinates if gps_coordinates else (None, None)
+
+        # The file path that gets stored must be relative to the upload folder.
+        db_file_path = os.path.join(team.id, final_stored_filename)
 
         # Create Image record (use final filename for serving)
         image = Image(
             filename=file.filename,
-            file_path=os.path.join(team.id, final_stored_filename),
+            file_path=db_file_path,
             team_id=team.id,
             uploaded_by=current_user.id,
             capture_time=capture_time,
@@ -273,6 +277,10 @@ def upload_images(team_id, team):
         )
 
         db.session.add(image)
+
+        # Format capture time for response
+        capture_time_str = capture_time.strftime("%Y:%m:%d %H:%M:%S") if capture_time else None
+
         uploaded_images.append({
             'id': image.id,
             'filename': image.filename,
@@ -298,39 +306,41 @@ def serve_image(team_id, filename):
     team = find_team_by_id(team_id)
     if not team:
         return abort(404, description="Invalid team URL.")
-    
+
     # Check if user has access to this team's images
     # Allow access if: authenticated user with team access OR public gallery access
     has_access = False
-    
+
     if current_user.is_authenticated:
         # Check if user has team access (member, captain, or admin)
         from app.permissions import PermissionChecker
         has_access = PermissionChecker.can_access_team(current_user, team)
-    
+
     # If no authenticated access, check if this is a public gallery request
     # Public gallery access is allowed via gallery_hash in referrer
     if not has_access:
         referrer = request.referrer
         if referrer and f"/gallery/{team.gallery_hash}" in referrer:
             has_access = True
-    
+
     if not has_access:
         return abort(403, description="Access denied to team images.")
 
     # Verify the image actually belongs to this team
     from app.models import Image
-    
+
     # Look for image where the file_path matches the requested filename within the team's directory
     image = Image.query.filter_by(
         team_id=team.id,
         file_path=os.path.join(team.id, secure_filename(filename))
     ).first()
-    
+
+
     if not image:
         return abort(404, description="Image not found.")
 
-    return send_from_directory(os.path.join(Config.UPLOAD_FOLDER, team.id), secure_filename(filename))
+    directory = os.path.abspath(os.path.join(Config.UPLOAD_FOLDER, team.id))
+    return send_from_directory(directory, secure_filename(filename))
 
 
 @teams.route('/<team_id>/withdraw', methods=['POST'])
@@ -376,7 +386,8 @@ def unwithdraw_team(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to un-withdraw team: {str(e)}'}), 500
+        logging.error(f"Failed to un-withdraw team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to un-withdraw team'}), 500
 
 
 @teams.route('/<team_id>/cancel', methods=['POST'])
@@ -400,7 +411,8 @@ def cancel_team(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to cancel team: {str(e)}'}), 500
+        logging.error(f"Failed to cancel team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to cancel team'}), 500
 
 
 @teams.route('/<team_id>/close', methods=['POST'])
@@ -424,7 +436,8 @@ def close_team(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to close team: {str(e)}'}), 500
+        logging.error(f"Failed to close team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to close team'}), 500
 
 
 @teams.route('/<team_id>/reopen', methods=['POST'])
@@ -445,7 +458,8 @@ def reopen_team(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to reopen team: {str(e)}'}), 500
+        logging.error(f"Failed to reopen team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to reopen team'}), 500
 
 
 @teams.route('/<team_id>/members/<user_id>')
@@ -476,6 +490,10 @@ def withdraw_membership(team_id, user_id, team, membership):
         if membership.status == TeamMembershipStatus.WITHDRAWN:
             return jsonify({'error': 'Membership is already withdrawn'}), 400
 
+        # Don't allow captain to withdraw
+        if membership.user_id == team.captain_id:
+            return jsonify({'error': 'Captain cannot withdraw from their own team. Make someone else captain first.'}), 400
+
         # Update membership status to withdrawn
         membership.status = TeamMembershipStatus.WITHDRAWN
         db.session.commit()
@@ -487,7 +505,8 @@ def withdraw_membership(team_id, user_id, team, membership):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to withdraw membership: {str(e)}'}), 500
+        logging.error(f"Failed to withdraw membership for user {user_id} from team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to withdraw membership'}), 500
 
 
 @teams.route('/<team_id>/members/<user_id>/unwithdraw', methods=['POST'])
@@ -508,7 +527,8 @@ def unwithdraw_membership(team_id, user_id, team, membership):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to re-join team: {str(e)}'}), 500
+        logging.error(f"Failed to re-join team {team_id} for user {user_id}: {str(e)}")
+        return jsonify({'error': f'Failed to re-join team'}), 500
 
 
 @teams.route('/<team_id>/members/<user_id>/remove', methods=['POST'])
@@ -535,7 +555,8 @@ def remove_member(team_id, membership_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to remove member: {str(e)}'}), 500
+        logging.error(f"Failed to remove member {membership.user_id} from team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to remove member'}), 500
 
 
 @teams.route('/<team_id>/members/<user_id>/promote', methods=['POST'])
@@ -558,9 +579,47 @@ def transfer_captain(team_id, user_id, team):
         if not membership:
             return jsonify({'error': 'New captain must be an active member of the team'}), 400
 
+        # Store previous captain info for email
+        previous_captain = team.captain
+
         # Transfer captaincy
         team.captain_id = user_id
         db.session.commit()
+
+        # Send captain transfer notification email
+        from app.utils import send_email_with_logging
+        from app.models import NotificationType
+
+        # Get current team member count
+        member_count = TeamMembership.query.filter_by(
+            team_id=team.id,
+            status=TeamMembershipStatus.ACTIVE
+        ).count()
+
+        subject = f"You're Now Captain of Team '{team.name}'"
+        context = {
+            'team': team,
+            'previous_captain': previous_captain,
+            'member_count': member_count,
+            'team_url': url_for('teams.team_members', team_id=team.id, _external=True)
+        }
+        metadata = {
+            'team_name': team.name,
+            'previous_captain_name': previous_captain.name,
+            'previous_captain_email': previous_captain.email,
+            'new_captain_name': new_captain.name,
+            'member_count': member_count
+        }
+
+        send_email_with_logging(
+            notification_type=NotificationType.CAPTAIN_TRANSFER,
+            recipient_user=new_captain,
+            subject=subject,
+            template_name='captain_transfer',
+            template_context=context,
+            related_team=team,
+            metadata=metadata
+        )
 
         return jsonify({
             'success': True,
@@ -569,7 +628,8 @@ def transfer_captain(team_id, user_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to transfer captaincy: {str(e)}'}), 500
+        logging.error(f"Failed to transfer captaincy for team {team_id} to user {user_id}: {str(e)}")
+        return jsonify({'error': f'Failed to transfer captaincy'}), 500
 
 
 @teams.route('/<team_id>/details', methods=['POST'])
@@ -608,7 +668,8 @@ def update_team_details(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to update team details: {str(e)}'}), 500
+        logging.error(f"Failed to update team details for team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to update team details'}), 500
 
 
 @teams.route('/<team_id>/password', methods=['POST'])
@@ -640,7 +701,8 @@ def manage_team_password(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to manage team password: {str(e)}'}), 500
+        logging.error(f"Failed to manage team password for team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to manage team password'}), 500
 
 
 @teams.route('/<team_id>/invite-link', methods=['POST'])
@@ -663,4 +725,5 @@ def generate_invite_link(team_id, team):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to generate invite link: {str(e)}'}), 500
+        logging.error(f"Failed to generate invite link for team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to generate invite link'}), 500

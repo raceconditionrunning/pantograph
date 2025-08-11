@@ -1,13 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>Privacy Policy - {{ app_name }}</title>
-</head>
-<body>
-<div class="container my-4">
-    {% include '_navbar.html' %}
+{% extends "base.html" %}
 
+{% block title %}Privacy Policy - {{ super() }}{% endblock %}
+
+{% block content %}
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
@@ -48,7 +43,4 @@
             </div>
         </div>
     </div>
-</div>
-{% include '_footer.html' %}
-</body>
-</html>
+{% endblock %}

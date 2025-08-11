@@ -100,17 +100,44 @@ def create_team():
             )
             db.session.add(captain_membership)
             redirect_url = url_for('teams.team_members', team_id=new_team.id)
-            message = 'Solo entry created successfully! You can edit your preferences anytime.'
+            message = 'Solo entry created successfully. You can edit your preferences anytime.'
         else:
             # Team format captains still need to set their preferences
             # No membership created here - they'll create it via join form
             redirect_url = url_for('user.join_team')
-            message = 'Team created successfully! Now enter your preferences.'
+            message = 'Team created successfully. Now enter your preferences.'
 
         # Update email opt-in status for all team types
         current_user.email_opt_in = email_opt_in
 
         db.session.commit()
+
+        # Send team creation confirmation email
+        from app.utils import send_email_with_logging
+        from app.models import NotificationType
+        from app.utils import format_hh_mm_from_seconds
+
+        subject = f"Team '{new_team.name}' Created"
+        context = {
+            'team': new_team,
+            'estimated_duration_display': format_hh_mm_from_seconds(new_team.estimated_duration_seconds),
+            'team_url': url_for('teams.team_members', team_id=new_team.id, _external=True)
+        }
+        metadata = {
+            'team_name': new_team.name,
+            'team_format': new_team.format.value,
+            'estimated_duration_seconds': new_team.estimated_duration_seconds
+        }
+
+        send_email_with_logging(
+            notification_type=NotificationType.TEAM_CREATION,
+            recipient_user=current_user,
+            subject=subject,
+            template_name='team_creation',
+            template_context=context,
+            related_team=new_team,
+            metadata=metadata
+        )
 
         team_folder_path = os.path.join(Config.UPLOAD_FOLDER, new_team.id)
         os.makedirs(team_folder_path, exist_ok=True)
@@ -125,7 +152,9 @@ def create_team():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to create team: {str(e)}'}), 500
+        import logging
+        logging.error(f"Failed to create team: {str(e)}")
+        return jsonify({'error': f'Failed to create team'}), 500
 
 
 @user.route('/join-team', methods=['GET', 'POST'])
@@ -285,8 +314,8 @@ def handle_team_registration_post(stations, mode='join'):
 
         if not is_editing_existing_membership:
             if team.status == TeamStatus.OPEN:
-                # For open teams, check password if required
-                if team.password_hash and not invite_token: # Invite token bypasses password
+                # For open teams, check password if required (unless user is the team captain)
+                if team.password_hash and not invite_token and team.captain_id != current_user.id: # Invite token or team captain bypasses password
                     if not team_password:
                         return jsonify({'error': 'This team requires a password'}), 400
                     if not team.check_password(team_password):
@@ -320,7 +349,11 @@ def handle_team_registration_post(stations, mode='join'):
         if not waiver_agreed:
             return jsonify({'error': 'You must agree to the waiver terms'}), 400
 
+        # Update email opt-in status
+        current_user.email_opt_in = email_opt_in
+
         # Handle different scenarios
+        membership_to_log = None
         if is_switching_teams:
             # User is switching to a different team - remove old membership and create new one
             db.session.delete(existing_membership)
@@ -334,6 +367,7 @@ def handle_team_registration_post(stations, mode='join'):
                 comments=comments if comments else None
             )
             db.session.add(membership)
+            membership_to_log = membership  # Log this as a new member
             message = f'Successfully switched to {team.name}'
         elif existing_membership:
             # Update existing membership
@@ -355,6 +389,7 @@ def handle_team_registration_post(stations, mode='join'):
                 comments=comments if comments else None
             )
             db.session.add(membership)
+            # Don't log captain joining their own team for digest
             message = f'Successfully added preferences for {team.name}'
         else:
             # Create new team membership
@@ -368,12 +403,46 @@ def handle_team_registration_post(stations, mode='join'):
                 comments=comments if comments else None
             )
             db.session.add(membership)
+            # Log member join event for digest processing (only for new members, not captains)
+            if team.captain_id != current_user.id:
+                membership_to_log = membership
             message = f'Successfully joined {team.name}'
 
-        # Update email opt-in status
-        current_user.email_opt_in = email_opt_in
-
+        # Commit all changes first
         db.session.commit()
+
+        # Send member joined notification email (for new members only, not updates)
+        if membership_to_log and not is_switching_teams:
+            from app.utils import send_email_with_logging
+            from app.models import NotificationType
+
+            subject = f"Welcome to Team '{team.name}'!"
+            context = {
+                'team': team,
+                'membership': membership_to_log,
+                'team_url': url_for('teams.team_members', team_id=team.id, _external=True)
+            }
+            metadata = {
+                'team_name': team.name,
+                'member_name': current_user.name,
+                'preferred_miles': float(membership_to_log.preferred_miles) if membership_to_log.preferred_miles else None,
+                'willing_to_lead': membership_to_log.willing_to_lead
+            }
+
+            send_email_with_logging(
+                notification_type=NotificationType.MEMBER_JOINED,
+                recipient_user=current_user,
+                subject=subject,
+                template_name='member_joined',
+                template_context=context,
+                related_team=team,
+                metadata=metadata
+            )
+
+        # Log member join event for digest processing (after commit so we have IDs)
+        if membership_to_log:
+            from app.utils import log_member_join_event
+            log_member_join_event(team, membership_to_log)
 
         return jsonify({
             'success': True,
@@ -384,7 +453,9 @@ def handle_team_registration_post(stations, mode='join'):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to process registration: {str(e)}'}), 500
+        import logging
+        logging.error(f"Failed to process team registration: {str(e)}")
+        return jsonify({'error': f'Failed to process registration'}), 500
 
 def _perform_user_deletion(user_to_delete):
     """Helper function to encapsulate user deletion logic."""
@@ -406,12 +477,28 @@ def _perform_user_deletion(user_to_delete):
         # Delete user's team memberships
         TeamMembership.query.filter_by(user_id=user_to_delete.id).delete()
 
+        # Delete any notification logs associated with this user
+        from app.models import NotificationLog
+        NotificationLog.query.filter_by(recipient_user_id=user_to_delete.id).delete()
+
         # Delete any teams where user was the only captain
         for team in captained_teams:
+            # Delete all images associated with this team first
+            from app.models import Image
+            Image.query.filter_by(team_id=team.id).delete()
+
+            # Delete any notification logs associated with this team
+            NotificationLog.query.filter_by(related_team_id=team.id).delete()
+
             # Delete team folder if it exists
             team_folder = os.path.join(Config.UPLOAD_FOLDER, team.id)
             if os.path.exists(team_folder):
-                shutil.rmtree(team_folder)
+                try:
+                    shutil.rmtree(team_folder)
+                except OSError as e:
+                    # Log error but don't fail the deletion
+                    import logging
+                    logging.warning(f"Failed to delete team folder {team_folder}: {e}")
 
             # Delete team from database
             db.session.delete(team)
@@ -428,7 +515,19 @@ def _perform_user_deletion(user_to_delete):
 
     except Exception as e:
         db.session.rollback()
-        return False, f'Failed to delete user: {str(e)}'
+        import logging
+        logging.error(f"User deletion failed for {user_to_delete.email}: {str(e)}")
+
+        # Provide user-friendly error messages
+        error_msg = str(e).lower()
+        if 'foreign key' in error_msg or 'constraint' in error_msg:
+            return False, 'Unable to delete account due to data relationships. Please contact support for assistance.'
+        elif 'permission' in error_msg or 'access' in error_msg:
+            return False, 'Permission denied. You may not have sufficient privileges to delete this account.'
+        elif 'disk' in error_msg or 'space' in error_msg:
+            return False, 'Storage error occurred while deleting account. Please try again later.'
+        else:
+            return False, 'An unexpected error occurred while deleting the account. Please contact support if this persists.'
 
 
 @user.route('/delete-account', methods=['POST'])
@@ -452,3 +551,31 @@ def delete_user(user_id, user):
         return jsonify({'success': True, 'message': message}), 200
     else:
         return jsonify({'error': message}), 400
+
+
+@user.route('/notification-preferences', methods=['PATCH'])
+@login_required
+def update_notification_preferences():
+    """Update user's notification preferences"""
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # Update captain notifications preference
+        if 'captain_notifications_enabled' in data:
+            current_user.captain_notifications_enabled = bool(data['captain_notifications_enabled'])
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Notification preferences updated successfully'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.error(f"Failed to update notification preferences for user {current_user.id}: {str(e)}")
+        return jsonify({'error': f'Failed to update preferences'}), 500

@@ -2,7 +2,7 @@ import os
 import shutil
 from flask import Blueprint, render_template, jsonify, url_for, request
 from flask_login import current_user
-from app.models import db, User, Team, TeamMembership, TeamStatus, TeamFormat, TeamMembershipStatus
+from app.models import db, User, Team, TeamMembership, TeamStatus, TeamFormat, TeamMembershipStatus, Image
 from app.permissions import admin_required
 from app.utils import is_allowed_image, format_mm_ss_from_seconds
 from app.config import Config
@@ -18,13 +18,8 @@ def admin_dashboard():
 
     teams = []
     for team in db_teams:
-        team_path = os.path.join(Config.UPLOAD_FOLDER, team.id)
-
-        # Count images in team folder (if it exists)
-        image_count = 0
-        if os.path.exists(team_path) and os.path.isdir(team_path):
-            image_count = len([f for f in os.listdir(team_path)
-                              if os.path.isfile(os.path.join(team_path, f)) and is_allowed_image(f)])
+        # Count images from database (avoids double counting HEIC->JPEG conversions)
+        image_count = Image.query.filter_by(team_id=team.id).count()
 
         teams.append({
             'name': team.name,
@@ -91,7 +86,10 @@ def delete_team(team_id):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to delete team: {str(e)}'}), 500
+        # Log the error for debugging
+        import logging
+        logging.error(f"Failed to delete team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to delete team'}), 500
 
 
 
@@ -118,6 +116,24 @@ def approve_team(team_id):
             team.status = TeamStatus.OPEN
         db.session.commit()
 
+        # Send approval email to team captain with logging
+        from app.utils import send_email_with_logging
+        from app.models import NotificationType
+
+        subject = f"Team '{team.name}' Registration Approved"
+        context = {'team': team}
+        metadata = {'team_name': team.name, 'team_format': team.format.value}
+
+        send_email_with_logging(
+            notification_type=NotificationType.TEAM_APPROVAL,
+            recipient_user=team.captain,
+            subject=subject,
+            template_name='team_approval',
+            template_context=context,
+            related_team=team,
+            metadata=metadata
+        )
+
         return jsonify({
             'success': True,
             'message': f'Team "{team.name}" approved successfully'
@@ -125,7 +141,9 @@ def approve_team(team_id):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to approve team: {str(e)}'}), 500
+        import logging
+        logging.error(f"Failed to approve team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to approve team'}), 500
 
 
 @admin.route('/team/<team_id>/baton_serial', methods=['POST'])
@@ -150,4 +168,34 @@ def update_baton_serial(team_id):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to update baton serial: {str(e)}'}), 500
+        import logging
+        logging.error(f"Failed to update baton serial for team {team_id}: {str(e)}")
+        return jsonify({'error': f'Failed to update baton serial'}), 500
+
+
+@admin.route('/email-templates')
+@admin_required
+def email_templates():
+    """Admin interface to browse and preview email templates"""
+    from app.email_preview import get_available_templates
+    templates = get_available_templates()
+    return render_template('admin_email_templates.html', templates=templates)
+
+
+@admin.route('/email-templates/<template_name>')
+@admin_required
+def raw_email_template(template_name):
+    """Return raw HTML of email template with sample data (for iframe)"""
+    from app.email_preview import get_sample_data_for_template
+
+    try:
+        # Get sample data for this template
+        sample_data = get_sample_data_for_template(template_name)
+
+        # Render just the email template HTML
+        return render_template(f'emails/{template_name}.html', **sample_data)
+
+    except Exception as e:
+        import logging
+        logging.error(f"Error rendering template '{template_name}': {str(e)}")
+        return f"Error rendering template '{template_name}'", 500

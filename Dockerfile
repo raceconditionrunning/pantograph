@@ -4,6 +4,7 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r pantograph && useradd --create-home -r -g pantograph -u 1001 pantograph
 ENV HOME=/home/pantograph
+ENV FLASK_ENV=production
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv

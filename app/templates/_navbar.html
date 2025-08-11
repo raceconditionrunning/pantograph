@@ -1,6 +1,8 @@
 <nav class="navbar navbar-expand-lg navbar-light mb-4">
     <div class="container-fluid">
         <a class="navbar-brand me-4" href="{{ url_for('main.index') }}">
+            <img src="{{ url_for('static', filename='pantograph.svg') }}" alt="Logo" width="24" height="24"
+                 class="d-inline-block align-center invert-when-dark" >
             {{ app_name }}
         </a>
 
@@ -52,7 +54,7 @@
                 <!-- Create/Join Team links (for users without teams OR unauthenticated users) -->
                 {% if not user_team %}  {# OPENS: Show Create/Join Team links for users without teams #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.create_team' %}active{% endif %} pt-lg-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.create_team' %}active{% endif %}"
                        href="{{ url_for('user.create_team') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.create_team' %}add-circle{% else %}add-circle-outline{% endif %}"
@@ -61,7 +63,7 @@
                     </a>
                 </div>
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.join_team' %}active{% endif %} pt-lg-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.join_team' %}active{% endif %}"
                        href="{{ url_for('user.join_team') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.join_team' %}person-add{% else %}person-add-outline{% endif %}"
@@ -72,7 +74,7 @@
                 <!-- My Registration link (for authenticated team members only) -->
                 {% elif current_user.is_authenticated and user_team.format == TeamFormat.TEAM %}  {# ELIF: Show My Registration for authenticated team members #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.my_registration' %}active fw-bold{% endif %} pt-lg-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'user.my_registration' %}active fw-bold{% endif %}"
                        href="{{ url_for('user.my_registration') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'user.my_registration' %}person{% else %}person-outline{% endif %}"
@@ -85,7 +87,7 @@
                 <!-- Admin link (authenticated admins only) -->
                 {% if current_user.is_authenticated and current_user.is_admin %}  {# OPENS: Show Admin link for admin users #}
                 <div class="nav-item">
-                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'admin.admin_dashboard' %}active{% endif %} pt-lg-1"
+                    <a class="nav-link d-flex align-items-center {% if request.endpoint == 'admin.admin_dashboard' %}active{% endif %}"
                        href="{{ url_for('admin.admin_dashboard') }}">
                         <ion-icon
                                 name="{% if request.endpoint == 'admin.admin_dashboard' %}settings{% else %}settings-outline{% endif %}"

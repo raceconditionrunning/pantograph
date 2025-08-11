@@ -1,15 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>Join Team - {{ app_name }}</title>
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}Join Team - {{ super() }}{% endblock %}
 
-
-<div class="container my-4">
-    {% include '_navbar.html' %}
+{% block content %}
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
@@ -100,9 +93,10 @@
                         {{ error_message }}
                     </div>
                     {% elif (not teams or (existing_team and teams|selectattr('id', 'ne', existing_team.id)|list|length == 0)) and mode != 'edit' and mode != 'view' and not pending_captain_team and not invited_team %}
-                    <div class="alert alert-info" role="alert">
-                        <ion-icon name="information-circle" class="me-2"></ion-icon>
-                        No teams are currently open for joining. Why not <a href="{{ url_for('user.create_team') }}">create one</a>?
+                    <div class="text-center py-4 text-muted">
+                        <ion-icon name="people-outline" style="font-size: 2rem; opacity: 0.6;"></ion-icon>
+                        <p class="mt-2 mb-2">No teams are currently open for joining.</p>
+                        <p class="mb-0"><a href="{{ url_for('user.create_team') }}">Create your own team</a> to get started.</p>
                     </div>
                     {% else %}
 
@@ -168,7 +162,7 @@
 
                         <div class="mb-3">
                             <label for="preferred_miles" class="form-label">
-                                <ion-icon name="walk" class="me-1"></ion-icon>
+                                <ion-icon name="footsteps" class="me-1"></ion-icon>
                                 How many miles would you like to run? <span class="text-danger">*</span>
                             </label>
                             <input type="number" class="form-control" id="preferred_miles" name="preferred_miles"
@@ -182,7 +176,7 @@
                                 What pace per mile would you run your preferred distance? <span class="text-danger">*</span>
                             </label>
                             <input type="text" class="form-control" id="planned_pace" name="planned_pace"
-                                   placeholder="09:30" pattern="^\d{1,2}:\d{2}$" required {% if (mode == 'edit' or mode == 'view') and existing_membership %}value="{{ existing_membership.planned_pace_seconds | format_mm_ss_from_seconds }}"{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
+                                   placeholder="9:30" pattern="^\d{1,2}:\d{2}$" required {% if (mode == 'edit' or mode == 'view') and existing_membership %}value="{{ existing_membership.planned_pace_seconds | format_mm_ss_from_seconds }}"{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
                             <div class="form-text">Format: MM:SS (e.g., 09:30 for 9 minutes 30 seconds per mile). Your captain will adjust times to account for the elevation and street conditions of each leg.</div>
                         </div>
 
@@ -219,7 +213,7 @@
                                 Any notes or comments for scheduling?
                             </label>
                             <textarea class="form-control" id="comments" name="comments" rows="3"
-                                      placeholder="Let your captain know if you have hard constraints that would prevent your participation..." {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>{% if (mode == 'edit' or mode == 'view') and existing_membership %}{{ existing_membership.comments or '' }}{% endif %}</textarea>
+                                      placeholder="Let your captain and team mates know if you have hard constraints that would prevent your participation..." {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>{% if (mode == 'edit' or mode == 'view') and existing_membership %}{{ existing_membership.comments or '' }}{% endif %}</textarea>
                             <div class="form-text">Share any scheduling constraints, preferences, or other relevant information.</div>
                         </div>
 
@@ -253,7 +247,7 @@
                                 <div class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
                                     <label class="form-check-label" for="email_opt_in">
-                                       Email me before the next LRR.
+                                       Email me when the next LRR happens.
                                     </label>
                                 </div>
                             </div>
@@ -298,8 +292,9 @@
             </div>
         </div>
     </div>
-</div>
+{% endblock %}
 
+{% block scripts %}
 <script type="module">
 import { membershipAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
@@ -338,10 +333,18 @@ if (plannedPaceInput) {
 document.getElementById('join-team-form').addEventListener('submit', async function(e) {
     e.preventDefault();
 
+    const submitBtn = document.getElementById('submit-btn');
     const alertContainer = document.getElementById('alert-container');
 
     // Clear previous alerts
     api.clearAlerts(alertContainer);
+
+    // Show loading state
+    {% if mode == 'edit' %}
+        api.setButtonLoading(submitBtn, 'Updating...');
+    {% else %}
+        api.setButtonLoading(submitBtn, 'Joining...');
+    {% endif %}
 
     let result;
     {% if mode == 'edit' %}
@@ -351,14 +354,16 @@ document.getElementById('join-team-form').addEventListener('submit', async funct
     {% endif %}
 
     if (result.success) {
-        // Show success message
-        api.showAlert(alertContainer, 'success', result.data.message, 'checkmark-circle');
+        // Show success toast
+        api.showToast(result.data.message, 'success');
 
         // Redirect after a short delay
         api.redirectAfterDelay(result.data.redirect_url || '{{ url_for("main.index") }}');
     } else {
         // Show error message
         api.showAlert(alertContainer, 'danger', result.error || 'Failed to submit form', 'warning');
+        // Reset button
+        api.resetButton(submitBtn);
     }
 });
 
@@ -425,7 +430,4 @@ window.unwithdrawTeam = async function(teamName, shortId) {
     }
 };
 </script>
-{% include '_footer.html' %}
-
-</body>
-</html>
+{% endblock %}

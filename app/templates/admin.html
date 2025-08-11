@@ -1,15 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>Admin - {{ app_name }}</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-<div class="container my-4">
-    {% include '_navbar.html' %}
+{% block title %}Admin - {{ super() }}{% endblock %}
 
-    <h1>Admin</h1>
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Admin</h1>
+        <div>
+            <a href="{{ url_for('admin.email_templates') }}" class="btn btn-outline-primary">
+                <ion-icon name="mail-outline" class="me-1"></ion-icon>
+                Email Templates
+            </a>
+        </div>
+    </div>
 
     <div class="row">
         <div class="col-12">
@@ -272,8 +274,10 @@
             </div>
         </div>
     </div>
-</div>
+{% endblock %}
 
+{% block footer %}
+{{ super() }}
 <!-- Delete Team Confirmation Modal -->
 <div class="modal fade" id="deleteTeamModal" tabindex="-1" aria-labelledby="deleteTeamModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -334,7 +338,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script type="module">
 import * as bootstrap from 'bootstrap';
 import { userAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
@@ -476,7 +482,4 @@ window.cancelTeam = async function(teamName, shortId) {
     }
 }
 </script>
-
-{% include '_footer.html' %}
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "emails/email_base.html" %}
+
+{% block title %}You've Been Made Team Captain{% endblock %}
+
+{% block header %}You're Now Team Captain{% endblock %}
+
+{% block content %}
+    <p>You have been made the new captain of your team for {{ event_name }}.</p>
+
+    <div class="team-info">
+        <p><strong>Team:</strong> {{ team.name }}</p>
+        <p><strong>Format:</strong> {{ team.format.value }}</p>
+        <p><strong>Status:</strong> {{ team.status.value.title() }}</p>
+        <p><strong>Current Members:</strong> {{ member_count }}</p>
+    </div>
+
+    {% if previous_captain %}
+    <div class="previous-captain">
+        <p><strong>Previous Captain:</strong> {{ previous_captain.name }} has transferred team leadership to you.</p>
+    </div>
+    {% endif %}
+
+    {% include 'emails/_captain_responsibilities.html' %}
+
+    <div class="btn-container">
+        <a href="{{ team_url }}" class="btn">Manage Your Team</a>
+    </div>
+
+    <p><strong>Next Steps:</strong></p>
+    <ul>
+        <li>Review your team roster and member preferences</li>
+        <li>Plan your race strategy and runner assignments</li>
+        <li>Recruit additional members if needed</li>
+        <li>Coordinate with your team for training and race day logistics</li>
+    </ul>
+
+    <p><small>As team captain, you have access to your team members' email addresses, and control of team settings and invite links. If you have questions about your captain responsibilities, contact us at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></small></p>
+{% endblock %}

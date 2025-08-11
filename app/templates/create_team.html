@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>Create Team - {{ app_name }}</title>
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}Create Team - {{ super() }}{% endblock %}
 
-<div class="container my-4">
-{% include '_navbar.html' %}
+{% block content %}
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm">
@@ -71,7 +65,7 @@
 
                         <div class="mb-3">
                             <label for="comments" class="form-label">
-                                <ion-icon name="chatbubble" class="me-1"></ion-icon>
+                                <ion-icon name="chatbubble-ellipses" class="me-1"></ion-icon>
                                 Comments
                             </label>
                             <textarea class="form-control" id="comments" name="comments" rows="3"
@@ -81,7 +75,7 @@
 
                         <div class="mb-3">
                             <label for="previous_baton_serial" class="form-label">
-                                <ion-icon name="flag-outline" class="me-1"></ion-icon>
+                                <ion-icon name="keypad" class="me-1"></ion-icon>
                                 Previous Baton Serial
                             </label>
                             <input type="text" class="form-control" id="previous_baton_serial" name="previous_baton_serial" maxlength="12" placeholder=""{% if not current_user.is_authenticated %} disabled{% endif %}>
@@ -120,7 +114,7 @@
                                 <div class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
                                     <label class="form-check-label" for="email_opt_in">
-                                       Email me before the next LRR.
+                                       Email me when the next LRR happens.
                                     </label>
                                 </div>
                             </div>
@@ -137,8 +131,9 @@
             </div>
         </div>
     </div>
-</div>
+{% endblock %}
 
+{% block scripts %}
 <script type="module">
 import { teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
 
@@ -228,8 +223,8 @@ document.getElementById('create-team-form').addEventListener('submit', async fun
     const result = await teamAPI.createTeam(new FormData(this));
 
     if (result.success) {
-        // Show success message
-        api.showAlert(alertContainer, 'success', result.data.message, 'checkmark-circle');
+        // Show success toast
+        api.showToast(result.data.message, 'success');
 
         // Redirect after a short delay
         api.redirectAfterDelay(result.data.redirect_url || '{{ url_for("user.join_team") }}');
@@ -247,7 +242,4 @@ if (estimatedDurationInput) {
     Utils.formatTimeInput(estimatedDurationInput, 24); // Max 24 hours
 }
 </script>
-
-{% include '_footer.html' %}
-</body>
-</html>
+{% endblock %}

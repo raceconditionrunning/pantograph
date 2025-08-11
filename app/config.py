@@ -28,10 +28,12 @@ def get_secret(secret_name):
 class Config:
     # Application Name
     APPLICATION_NAME = "Pantograph"
+    EVENT_NAME = "Light Rail Relay 2025"
+    EVENT_URL = "https://raceconditionrunning.com/light-rail-relay-2025"
 
     # Core Flask configuration
     SECRET_KEY = get_secret('SECRET_KEY')
-    
+
     # Session security configuration
     SESSION_COOKIE_SECURE = True  # Only send cookies over HTTPS
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
@@ -55,6 +57,13 @@ class Config:
     # Admin configuration
     ADMIN_EMAIL = get_secret('ADMIN_EMAIL')
     CONTACT_EMAIL = get_secret('CONTACT_EMAIL')
+    NOTIFICATION_EMAIL = get_secret('NOTIFICATION_EMAIL')
+
+    # Site configuration
+    CANONICAL_URL = get_secret('CANONICAL_URL')  # e.g. 'https://pantograph.example.com'
+
+    # Email configuration
+    RESEND_API_KEY = get_secret('RESEND_API_KEY')
 
     # Upload configuration
     UPLOAD_FOLDER = './uploads'

@@ -371,6 +371,15 @@ export class UserAPI extends ApiClient {
             body: JSON.stringify(data)
         });
     }
+
+    // Update notification preferences
+    async updateNotificationPreferences(data) {
+        const url = this.getUrl('updateNotificationPreferences');
+        return await this.request(url, {
+            method: 'PATCH',
+            body: JSON.stringify(data)
+        });
+    }
 }
 
 // Image Management API

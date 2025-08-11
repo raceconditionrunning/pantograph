@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Email Templates - {{ super() }}{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                Email Templates
+            </h2>
+            <p class="text-muted">Preview and test email templates with sample data</p>
+        </div>
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary">
+            <ion-icon name="arrow-back-outline" class="me-1"></ion-icon>
+            Back to Admin
+        </a>
+    </div>
+
+    <div class="row">
+        {% for template in templates %}
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ template.display }}</h5>
+                    <p class="card-text text-muted small">
+                        Template: <code>{{ template.name }}.html</code>
+                    </p>
+
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin.raw_email_template', template_name=template.name) }}"
+                           class="btn btn-primary" target="_blank">
+                            <ion-icon name="eye-outline" class="me-1"></ion-icon>
+                            Preview Template
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
+        <strong>Note:</strong> These previews use sample data to show how emails will appear to users.
+        The actual emails sent will use real user and team data.
+    </div>
+{% endblock %}
+

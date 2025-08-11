@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, send_from_directory
+import os
 
 main = Blueprint('main', __name__)
 
@@ -24,3 +25,11 @@ def terms_of_service():
     """Renders the terms of service page."""
     return render_template('terms.html', 
                          contact_email=current_app.config.get('CONTACT_EMAIL'))
+
+
+@main.route('/.well-known/microsoft-identity-association.json')
+def microsoft_identity_association():
+    """Serves Microsoft identity association file for OAuth verification"""
+    data_dir = os.path.join(current_app.root_path, '..', 'data')
+    return send_from_directory(data_dir, 'microsoft-identity-assocation.json', 
+                             mimetype='application/json')

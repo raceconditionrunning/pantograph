@@ -36,6 +36,10 @@ def create_app():
     # Make APPLICATION_NAME available globally in Jinja2 templates
     app.jinja_env.globals['app_name'] = app.config['APPLICATION_NAME']
 
+    app.jinja_env.globals['is_production'] = (
+        os.getenv('FLASK_ENV') != 'development' and os.getenv('FLASK_DEBUG') != '1'
+    )
+
     # Make model enums available globally in Jinja2 templates
     from app.models import TeamMembershipStatus, TeamFormat, TeamStatus, OAuthProvider
     app.jinja_env.globals['TeamMembershipStatus'] = TeamMembershipStatus

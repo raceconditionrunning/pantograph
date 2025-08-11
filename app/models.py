@@ -1,5 +1,6 @@
 import enum
 import secrets
+import uuid
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime, timezone
@@ -29,6 +30,24 @@ class OAuthProvider(enum.Enum):
     GOOGLE = 'google'
     GITHUB = 'github'
     MICROSOFT = 'microsoft'
+
+class NotificationType(enum.Enum):
+    TEAM_APPROVAL = 'team_approved'
+    NEW_MEMBERS_DIGEST = 'new_members_digest'
+    TEAM_MEMBER_REMOVAL = 'member_removed'
+    MEMBER_JOINED = 'member_joined'
+    TEAM_CREATION = 'team_created'
+    CAPTAIN_TRANSFER = 'captain_transferred'
+    EVENT_UPDATE = 'event_updated'
+    MISSING_PHOTOS = 'missing_photos'
+    PAYMENT_REQUIRED = 'payment_required'
+    REGISTRATION_DEADLINE = 'registration_deadline'
+
+class NotificationStatus(enum.Enum):
+    PENDING = 'pending'
+    SENT = 'sent'
+    FAILED = 'failed'
+    BOUNCED = 'bounced'
 
 class Team(db.Model):
     id = db.Column(db.String(8), primary_key=True, default=lambda: secrets.token_urlsafe(6))
@@ -114,6 +133,7 @@ class User(db.Model, UserMixin):
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_admin = db.Column(db.Boolean, default=False)
     email_opt_in = db.Column(db.Boolean, default=False)
+    captain_notifications_enabled = db.Column(db.Boolean, default=True)
 
     @property
     def teams(self):
@@ -142,19 +162,52 @@ class Image(db.Model):
     team_id = db.Column(db.String(8), db.ForeignKey('team.id'), nullable=False)
     uploaded_by = db.Column(db.String(8), db.ForeignKey('user.id'), nullable=False)
     upload_time = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    
+
     # EXIF data
     capture_time = db.Column(db.DateTime, nullable=True)
     gps_lat = db.Column(db.Numeric(10, 7), nullable=True)
     gps_lng = db.Column(db.Numeric(10, 7), nullable=True)
-    
+
     # File info
     file_size = db.Column(db.Integer, nullable=True)
     mime_type = db.Column(db.String(100), nullable=True)
-    
+
     # Relationships
     team = db.relationship('Team', backref='images')
     uploader = db.relationship('User', backref='uploaded_images')
-    
+
     def __repr__(self):
-        return f'<Image {self.filename} by {self.uploader.name}>' 
+        return f'<Image {self.filename} by {self.uploader.name}>'
+
+
+class NotificationLog(db.Model):
+    __tablename__ = 'notification_log'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    notification_type = db.Column(db.Enum(NotificationType), nullable=False)
+    recipient_user_id = db.Column(db.String(8), db.ForeignKey('user.id'), nullable=False)
+    related_team_id = db.Column(db.String(8), db.ForeignKey('team.id'), nullable=True)
+    status = db.Column(db.Enum(NotificationStatus), nullable=False, default=NotificationStatus.PENDING)
+
+    # Email details
+    subject = db.Column(db.String(255), nullable=True)
+    template_name = db.Column(db.String(100), nullable=True)
+    email_id = db.Column(db.String(255), nullable=True)
+
+    # Metadata for notification-specific data (JSON)
+    notification_data = db.Column(db.Text, nullable=True)  # JSON string for flexible data
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    sent_at = db.Column(db.DateTime, nullable=True)
+    failed_at = db.Column(db.DateTime, nullable=True)
+
+    # Error details for failed notifications
+    error_message = db.Column(db.Text, nullable=True)
+
+    # Relationships
+    recipient = db.relationship('User', backref='received_notifications')
+    team = db.relationship('Team', backref='team_notifications')
+
+    def __repr__(self):
+        return f'<NotificationLog {self.notification_type.value} to {self.recipient.email}>'

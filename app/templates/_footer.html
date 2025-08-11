@@ -2,8 +2,8 @@
     <div class="d-flex flex-wrap justify-content-center gap-3 gap-lg-4">
         <a href="{{ url_for('main.terms_of_service') }}" class="text-muted text-decoration-none small">Terms of Service</a>
         <a href="{{ url_for('main.privacy_policy') }}" class="text-muted text-decoration-none small">Privacy Policy</a>
-        <a href="https://www.lightrailrelay.com/" class="text-muted text-decoration-none small" target="_blank" rel="noopener noreferrer">
-            Light Rail Relay <ion-icon name="open-outline" style="vertical-align: -1px;"></ion-icon>
+        <a href="{{ config.EVENT_URL }}" class="text-muted text-decoration-none small" target="_blank" >
+            {{ config.EVENT_NAME }} <ion-icon name="open-outline" style="vertical-align: -1px;"></ion-icon>
         </a>
     </div>
 </footer>
@@ -28,6 +28,8 @@
                 <p>This will:</p>
                 <ul>
                     <li>Remove the user from all teams</li>
+                    <li>Delete any teams they were captaining</li>
+                    <li>Delete all photos they've uploaded</li>
                     <li>Delete their account and preferences</li>
                     <li>Remove all their team memberships</li>
                     <li>Remove them from the database</li>
@@ -65,6 +67,7 @@
                 <ul>
                     <li>Remove you from any teams you've joined</li>
                     <li>Cancel any teams you're captaining</li>
+                    <li>Delete all photos you've uploaded to your teams</li>
                     <li>Delete all your preferences and registration data</li>
                     <li>Sign you out and remove your account permanently</li>
                 </ul>

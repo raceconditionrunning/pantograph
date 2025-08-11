@@ -1,20 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>{{ app_name }}</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-
-<div class="container my-4">
-    {% include '_navbar.html' %}
+{% block content %}
     <div class="row justify-content-center">
         <div class="col-md-6 ">
             <div class="card shadow-sm">
                 <div class="card-body text-center">
                     <h2 class="card-title">Pantograph</h2>
-                    <p>Register for <a href="https://lightrailrelay.com">Light Rail Relay</a> by creating or joining a team. Upload exchange photos for timing.</p>
+                    <p>Register for <a href="{{ config.EVENT_URL }}">{{ config.EVENT_NAME }}</a> by creating or joining a team. Upload exchange photos for timing.</p>
                     <hr>
                     {% if current_user.is_authenticated %}
                         {% set user_membership = current_user.memberships | selectattr('status', 'equalto', TeamMembershipStatus.ACTIVE) | first if current_user.memberships else none %}
@@ -56,8 +48,4 @@
             </div>
         </div>
     </div>
-    {% include '_footer.html' %}
-</div>
-
-</body>
-</html>
+{% endblock %}

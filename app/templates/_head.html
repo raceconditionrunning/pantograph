@@ -1,5 +1,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+
+<!-- SEO & Social -->
+<meta name="description" content="Photo relay race management system">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="{{ app_name }}">
+<meta property="og:description" content="Photo relay race management system">
+<meta property="og:image" content="{{ url_for('static', filename='icon.png') }}" />
+<meta property="og:image:width" content="512" />
+<meta property="og:image:height" content="512" />
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="{{ config.CANONICAL_URL }}{{ request.path }}">
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
 <script>
@@ -93,7 +108,7 @@ configureUrls({
         deleteImage: '{{ url_for("teams.delete_image", team_id="__TEAM_ID__", image_id="__IMAGE_ID__") }}',
 {% endif %}
 
-{% if team and permissions.can_manage_team(current_user, team) %}
+{% if team and permissions.can_manage_team(current_user, team) or current_user.is_admin %}
     // Team captain management
     withdrawTeam: '{{ url_for("teams.withdraw_team", team_id="__TEAM_ID__") }}',
     unwithdrawTeam: '{{ url_for("teams.unwithdraw_team", team_id="__TEAM_ID__") }}',
@@ -113,6 +128,7 @@ configureUrls({
     // User management
     deleteUser: '{{ url_for("user.delete_user", user_id="__USER_ID__") }}',
     updatePreferences: '{{ url_for("user.my_registration") }}',
+    updateNotificationPreferences: '{{ url_for("user.update_notification_preferences") }}',
 
     {% if current_user.is_authenticated and current_user.is_admin %}
     // Admin routes
@@ -232,4 +248,23 @@ window.deleteUser = async function(userId) {
     }
 }
 </script>
+
+{% if is_production %}
+<script>
+    window.goatcounter = {
+        path: function (p) {
+            p =  p.replace(
+          /\/(?:user|team|admin\/team|gallery)\/[a-zA-Z0-9_-]{8,}|(?<=invite_token=)[a-zA-Z0-9_-]+/g,
+          '<private_identifier>'
+      );
+
+
+            return "panto." + p;
+        },
+    }
+</script>
+<script async
+        data-goatcounter="https://stats.raceconditionrunning.com/count" data-proofer-ignore src="https://stats.raceconditionrunning.com/count.js"></script>
+
+{% endif %}
 

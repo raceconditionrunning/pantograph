@@ -1,0 +1,30 @@
+{% extends "emails/email_base.html" %}
+
+{% block title %}Team Registration Approved{% endblock %}
+
+{% block header %}Team Registration Approved{% endblock %}
+
+{% block content %}
+    <p>Your team registration for {{ event_name }} has been approved.</p>
+
+    <div class="team-info">
+        <p><strong>Team:</strong> {{ team.name }}</p>
+        <p><strong>Format:</strong> {{ team.format.value }}</p>
+    </div>
+
+    <p><strong>Next steps:</strong></p>
+    <ul>
+        {% if team.status.value == 'open' %}
+        <li>Complete your team roster by inviting additional members</li>
+        {% endif %}
+        <li>Review event details and logistics</li>
+    </ul>
+
+    {% include 'emails/_captain_responsibilities.html' %}
+
+    <div class="btn-container">
+        <a href="{{ team_url }}" class="btn">View Your Team Page</a>
+    </div>
+
+    <p>If you have any questions, please contact us at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+{% endblock %}

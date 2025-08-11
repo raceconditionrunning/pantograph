@@ -1,38 +1,37 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  {% include '_head.html' %}
-  <title>Team {{ team.name }} Photos - {{ app_name }}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha256-V2sIX92Uh6ZaGSFTKMHghsB85b9toJtmazgG09AI2uk=" crossorigin="anonymous">
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}Team {{ team.name }} Photos - {{ super() }}{% endblock %}
 
-<div class="container my-4">
-  {% include '_navbar.html' %}
+{% block head_extra %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.css" crossorigin="anonymous">
+{% endblock %}
 
-
+{% block content %}
 {% include '_team_status_alerts.html' %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1>{{ team.name }} Photos</h1>
-</div>
-
-
-{% if permissions.can_access_team(current_user, team) %}
-<div class="mb-4 p-3 border rounded bg-light-subtle">
-    <label for="publicLink" class="form-label fw-semibold">
+  {% if permissions.can_access_team(current_user, team) %}
+  <div class="dropdown">
+    <button class="btn btn-outline-primary dropdown-toggle" type="button" id="shareDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+      <ion-icon name="share-outline" class="me-1"></ion-icon>
+      Share
+    </button>
+    <div class="dropdown-menu dropdown-menu-end p-3" aria-labelledby="shareDropdown" style="min-width: 350px;">
+      <h6 class="dropdown-header px-0">
         <ion-icon name="link-outline" class="me-1"></ion-icon>
         Public Gallery Link
-    </label>
-    <p class="form-text mt-0 mb-2">Share this view-only link with friends and family.</p>
-    <div class="input-group input-group-sm">
+      </h6>
+      <p class="text-muted mb-2 small">Share this view-only link with friends and family.</p>
+      <div class="input-group input-group-sm">
         <input type="text" class="form-control" id="publicLink" value="{{ request.url_root }}gallery/{{ team.gallery_hash }}" readonly>
         <button class="btn btn-outline-secondary" type="button" onclick="copyPublicLink()">
-            <ion-icon name="copy-outline"></ion-icon> Copy
+          <ion-icon name="copy-outline"></ion-icon> Copy
         </button>
+      </div>
     </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 
 {% if permissions.can_upload_to_team(current_user, team) %}
 <form id="uploadForm" action="{{ url_for('teams.upload_images', team_id=team.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
@@ -57,7 +56,7 @@
         <div class="spinner-border text-secondary opacity-50" role="status"><span class="visually-hidden">Loading...</span>
           </div>
       </div>
-        <img src="{{ url_for('teams_public.serve_image', team_id=team.id, filename=image.filename) }}" class="card-img-top" style="height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <img src="{{ url_for('teams_public.serve_image', team_id=team.id, filename=image.filename) }}" class="card-img-top bg-secondary-subtle" style="height: 200px; object-fit: contain; object-position: center;">
         <div class="card-body">
           <h5 class="card-title">{{ image.original_filename }}</h5>
           <p class="card-text">
@@ -83,8 +82,9 @@
 </div>
 
   <div id="map" style="width: 100%; height: 500px;"></div>
-</div>
+{% endblock %}
 
+{% block scripts %}
 <script type="module">
 import 'maplibre-gl';
 import ExifReader from 'exifreader';
@@ -137,9 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize your MapLibre map
 const map = new maplibregl.Map({
-    style: 'https://tiles.openfreemap.org/styles/liberty',
+    style: 'https://tiles.openfreemap.org/styles/positron',
     container: 'map',
-    zoom: 9.5,
+    zoom: 8.5,
     center: [-122.3321, 47.6062] // Default center [lng, lat]
 });
 
@@ -183,21 +183,21 @@ const uploadForm = document.getElementById('uploadForm');
 if (uploadForm) {
   uploadForm.addEventListener('submit', async function(event) {
     event.preventDefault(); // Prevent default form submission
-    
+
     const formData = new FormData(uploadForm);
     const uploadButton = document.getElementById('uploadButton');
     const teamId = '{{ team.id }}';
-    
+
     // Show loading state
     api.setButtonLoading(uploadButton, 'Uploading...');
-    
+
     try {
       const result = await imageAPI.uploadImages(teamId, formData);
-      
+
       if (result.success) {
         const uploadCount = result.data.images ? result.data.images.length : 0;
         api.showToast(`${uploadCount} images uploaded successfully!`, 'success');
-        
+
         // Refresh the page after a short delay
         setTimeout(() => {
           window.location.reload();
@@ -218,7 +218,7 @@ document.querySelectorAll('.delete-button').forEach(button => {
     const filename = this.getAttribute('data-filename');
     const imageId = this.getAttribute('data-image-id');
     const teamId = '{{ team.id }}';
-    
+
     if (confirm(`Are you sure you want to delete ${filename}?`)) {
       const result = await imageAPI.deleteImage(teamId, imageId);
 
@@ -247,7 +247,7 @@ fileInput.addEventListener('change', async function(event) {
     previewElement.classList.add('col-md-3', 'mb-3');
     previewElement.innerHTML = `
       <div class="card">
-        <img src="" class="card-img-top" style="max-width: 100%; max-height: 200px; object-fit: contain; object-position: center; background-color: #f8f9fa;">
+        <img src="" class="card-img-top" style="max-width: 100%; max-height: 200px; object-fit: contain; object-position: center;">
         <div class="card-body">
           <h5 class="card-title">${file.name}</h5>
           <p class="card-text">
@@ -329,6 +329,4 @@ window.copyPublicLink = async function() {
 };
 
 </script>
-{% include '_footer.html' %}
-</body>
-</html>
+{% endblock %}

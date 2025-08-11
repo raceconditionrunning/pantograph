@@ -1,0 +1,61 @@
+{% extends "emails/email_base.html" %}
+
+{% block title %}Welcome to the Team{% endblock %}
+
+{% block header %}Welcome to the Team!{% endblock %}
+
+{% block content %}
+    <p>You've joined a team for {{ event_name }}.</p>
+
+    <div class="team-info">
+        <p><strong>Team:</strong> {{ team.name }}</p>
+        <p><strong>Captain:</strong> {{ team.captain.name }}</p>
+        <p><strong>Format:</strong> {{ team.format.value }}</p>
+        <p><strong>Team Status:</strong> {{ team.status.value.title() }}</p>
+    </div>
+
+    <div class="member-preferences">
+        <h3>Your Preferences:</h3>
+        <div class="preference-row">
+            <span class="preference-label">Preferred Distance:</span>
+            <span>{{ membership.preferred_miles }} miles</span>
+        </div>
+        {% if membership.planned_pace_seconds %}
+        <div class="preference-row">
+            <span class="preference-label">Planned Pace:</span>
+            <span>{{ (membership.planned_pace_seconds // 60) }}:{{ '{:02d}'.format(membership.planned_pace_seconds % 60) }}/mile</span>
+        </div>
+        {% endif %}
+        {% if membership.preferred_station %}
+        <div class="preference-row">
+            <span class="preference-label">Preferred Station:</span>
+            <span>{{ membership.preferred_station }}</span>
+        </div>
+        {% endif %}
+        <div class="preference-row">
+            <span class="preference-label">Willing to Lead:</span>
+            <span>{% if membership.willing_to_lead %}Yes{% else %}No{% endif %}</span>
+        </div>
+        {% if membership.comments %}
+        <div class="preference-row">
+            <span class="preference-label">Comments:</span>
+            <span>{{ membership.comments }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="btn-container">
+        <a href="{{ my_preferences_url }}" class="btn">Manage Your Preferences</a>
+                <a href="{{ team_url }}" class="btn">View Team Page</a>
+    </div>
+
+    <div class="next-steps">
+        <h3>What's Next:</h3>
+        <ul>
+            <li><strong>Connect with your team:</strong> Your email has been shared with your captain. </li>
+        </ul>
+    </div>
+
+
+    <p><small>If you have questions, contact us at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></small></p>
+{% endblock %}

@@ -1,268 +1,266 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    {% include '_head.html' %}
-    <title>{{ team.name }} - {% if team.format == TeamFormat.SOLO %}My Entry{% else %}Team Members{% endif %} - {{ app_name }}</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-    <div class="container my-4">
-        {% include '_navbar.html' %}
+{% block title %}{{ team.name }} - {% if team.format == TeamFormat.SOLO %}My Entry{% else %}Team Members{% endif %} - {{ super() }}{% endblock %}
 
-        {% include '_team_status_alerts.html' %}
+{% block content %}
+    {% include '_team_status_alerts.html' %}
 
-        {% set captain_has_joined = active_members | selectattr('user_id', 'equalto', team.captain_id) | list | length > 0 %}
-        <h1> {{team.name }}{% if team.format == TeamFormat.TEAM %} Members{% endif %}</h1>
+    {% set captain_has_joined = active_members | selectattr('user_id', 'equalto', team.captain_id) | list | length > 0 %}
+    <h1> {{team.name }}{% if team.format == TeamFormat.TEAM %} Members{% endif %}</h1>
 
-        <div class="row">
-            <div class="col-12">
-                {% if team.format == TeamFormat.TEAM %}
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Roster ({{ active_members|length + withdrawn_members|length }})</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Member</th>
-                                        <th>Preferences</th>
-                                        <th>Joined</th>
-                                        {% if permissions.can_manage_team(current_user, team) %}
-                                        <th>Actions</th>
-                                        {% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Active Team Members -->
-                                    {% if active_members %}
-                                    <tr>
-                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-success px-3 py-2">
-                                            Active ({{ active_members|length }})
-                                        </td>
-                                    </tr>
-                                    {% for membership in active_members %}
-                                    <tr {% if current_user.is_authenticated and membership.user_id == current_user.id %}class="table-primary-subtle"{% endif %}>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                {% if membership.user.avatar_url %}
-                                                    <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary-subtle{% endif %}" width="40" height="40">
-                                                {% endif %}
-                                                <div>
-                                                    <strong>{{ membership.user.name }}</strong>
-                                                    {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <!--span class="badge bg-primary ms-2">Me</span-->
-                                                    {% endif %}
-                                                    {% if membership.user_id == team.captain_id %}
-                                                        <span class="badge bg-success ms-2 rounded-pill">Captain</span>
-                                                    {% endif %}
-                                                    {% if membership.willing_to_lead %}
-                                                        <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
-                                                    {% endif %}
-                                                    {% if permissions.can_manage_team(current_user, team) %}
-                                                        <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
-                                                            <small>{{ membership.user.email }}</small>
-                                                        </a>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="small">
-                                                {% if membership.preferred_miles %}
-                                                    <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
-                                                {% endif %}
-                                                {% if membership.planned_pace_seconds %}
-                                                    <strong>Pace:</strong> {{ membership.planned_pace_seconds | format_mm_ss_from_seconds }}/mi<br>
-                                                {% endif %}
-                                                {% if membership.preferred_station %}
-                                                    <strong>End Station:</strong> {{ membership.preferred_station }}<br>
-                                                {% endif %}
-                                                {% if membership.comments %}
-                                                    <strong>Comments:</strong> {{ membership.comments }}
-                                                {% endif %}
+    <div class="row">
+        <div class="col-12">
+            {% if team.format == TeamFormat.TEAM %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Roster ({{ active_members|length + withdrawn_members|length }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Preferences</th>
+                                    <th>Joined</th>
+                                    {% if permissions.can_manage_team(current_user, team) %}
+                                    <th>Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Active Team Members -->
+                                {% if active_members %}
+                                <tr>
+                                    <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-success px-3 py-2">
+                                        Active ({{ active_members|length }})
+                                    </td>
+                                </tr>
+                                {% for membership in active_members %}
+                                <tr {% if current_user.is_authenticated and membership.user_id == current_user.id %}class="table-primary-subtle"{% endif %}>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if membership.user.avatar_url %}
+                                                <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
+                                                     class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary-subtle{% endif %}" width="40" height="40">
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ membership.user.name }}</strong>
                                                 {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                    <a href="{{ url_for('user.my_registration') }}" class="text-primary text-decoration-none">
-                                                        <ion-icon name="create-outline" class="me-1"></ion-icon>Edit
+                                                    <!--span class="badge bg-primary ms-2">Me</span-->
+                                                {% endif %}
+                                                {% if membership.user_id == team.captain_id %}
+                                                    <span class="badge bg-success ms-2 rounded-pill">Captain</span>
+                                                {% endif %}
+                                                {% if membership.willing_to_lead %}
+                                                    <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
+                                                {% endif %}
+                                                {% if permissions.can_manage_team(current_user, team) %}
+                                                    <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
+                                                        <small>{{ membership.user.email }}</small>
                                                     </a>
                                                 {% endif %}
                                             </div>
-                                        </td>
-                                        <td>
-                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
-                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
-                                            </time>
-                                        </td>
-                                        {% if permissions.can_manage_team(current_user, team) %}
-                                        <td>
-                                            {% if membership.user_id != team.captain_id %}
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <ion-icon name="ellipsis-horizontal"></ion-icon>
-                                                </button>
-                                                <ul class="dropdown-menu">
-                                                    {% if current_user.is_captain_of(team) %}
-                                                    <li>
-                                                        <button class="dropdown-item" onclick="transferCaptaincy('{{ team.id }}', '{{ membership.user_id }}', '{{ membership.user.name }}')">
-                                                            <ion-icon name="crown-outline" class="me-2"></ion-icon>Make Captain
-                                                        </button>
-                                                    </li>
-                                                    {% endif %}
-                                                    <li>
-                                                        <button class="dropdown-item text-danger" onclick="removeMember('{{ membership.id }}', '{{ membership.user.name }}')">
-                                                            <ion-icon name="person-remove-outline" class="me-2"></ion-icon>Remove
-                                                        </button>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                            {% else %}
-                                            <span class="text-muted">—</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small">
+                                            {% if membership.preferred_miles %}
+                                                <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
                                             {% endif %}
-                                        </td>
+                                            {% if membership.planned_pace_seconds %}
+                                                <strong>Pace:</strong> {{ membership.planned_pace_seconds | format_mm_ss_from_seconds }}/mi<br>
+                                            {% endif %}
+                                            {% if membership.preferred_station %}
+                                                <strong>End Station:</strong> {{ membership.preferred_station }}<br>
+                                            {% endif %}
+                                            {% if membership.comments %}
+                                                <strong>Comments:</strong> {{ membership.comments }}
+                                            {% endif %}
+                                            {% if current_user.is_authenticated and membership.user_id == current_user.id %}
+                                                <a href="{{ url_for('user.my_registration') }}" class="text-primary text-decoration-none">
+                                                    <ion-icon name="create-outline" class="me-1"></ion-icon>Edit
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                            {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                        </time>
+                                    </td>
+                                    {% if permissions.can_manage_team(current_user, team) %}
+                                    <td>
+                                        {% if membership.user_id != team.captain_id %}
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <ion-icon name="ellipsis-horizontal"></ion-icon>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                {% if current_user.is_captain_of(team) %}
+                                                <li>
+                                                    <button class="dropdown-item" onclick="transferCaptaincy('{{ team.id }}', '{{ membership.user_id }}', '{{ membership.user.name }}')">
+                                                        <ion-icon name="crown-outline" class="me-2"></ion-icon>Make Captain
+                                                    </button>
+                                                </li>
+                                                {% endif %}
+                                                <li>
+                                                    <button class="dropdown-item text-danger" onclick="removeMember('{{ membership.id }}', '{{ membership.user.name }}')">
+                                                        <ion-icon name="person-remove-outline" class="me-2"></ion-icon>Remove
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
                                         {% endif %}
-                                    </tr>
-                                    {% endfor %}
+                                    </td>
                                     {% endif %}
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
 
-                                    <!-- Withdrawn Team Members -->
-                                    {% if withdrawn_members %}
-                                    <tr>
-                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-warning px-3 py-2">
-                                            Withdrawn ({{ withdrawn_members|length }})
-                                        </td>
-                                    </tr>
-                                    {% for membership in withdrawn_members %}
-                                    <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                {% if membership.user.avatar_url %}
-                                                    <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.6;">
+                                <!-- Withdrawn Team Members -->
+                                {% if withdrawn_members %}
+                                <tr>
+                                    <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-warning px-3 py-2">
+                                        Withdrawn ({{ withdrawn_members|length }})
+                                    </td>
+                                </tr>
+                                {% for membership in withdrawn_members %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if membership.user.avatar_url %}
+                                                <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
+                                                     class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.6;">
+                                            {% endif %}
+                                            <div>
+                                                <strong class="text-muted">{{ membership.user.name }}</strong>
+                                                {% if current_user.is_authenticated and membership.user_id == current_user.id %}
+                                                    <!--span class="badge bg-primary ms-2">Me</span-->
                                                 {% endif %}
-                                                <div>
-                                                    <strong class="text-muted">{{ membership.user.name }}</strong>
-                                                    {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <!--span class="badge bg-primary ms-2">Me</span-->
-                                                    {% endif %}
-                                                    {% if membership.user_id == team.captain_id %}
-                                                        <span class="badge bg-success ms-2 rounded-pill">Captain</span>
-                                                    {% endif %}
-                                                    {% if membership.willing_to_lead %}
-                                                        <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
-                                                    {% endif %}
-                                                    {% if permissions.can_manage_team(current_user, team) %}
-                                                        <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
-                                                            <small>{{ membership.user.email }}</small>
-                                                        </a>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="small text-muted">
-                                                {% if membership.preferred_miles %}
-                                                    <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
+                                                {% if membership.user_id == team.captain_id %}
+                                                    <span class="badge bg-success ms-2 rounded-pill">Captain</span>
                                                 {% endif %}
-                                                {% if membership.planned_pace %}
-                                                    <strong>Pace:</strong> {{ membership.planned_pace }}/mile<br>
+                                                {% if membership.willing_to_lead %}
+                                                    <span class="badge bg-info text-dark ms-2 rounded-pill">Leg Leader</span>
                                                 {% endif %}
-                                                {% if membership.preferred_station %}
-                                                    <strong>End Station:</strong> {{ membership.preferred_station }}<br>
-                                                {% endif %}
-                                                {% if membership.comments %}
-                                                    <strong>Comments:</strong> {{ membership.comments }}
+                                                {% if permissions.can_manage_team(current_user, team) %}
+                                                    <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
+                                                        <small>{{ membership.user.email }}</small>
+                                                    </a>
                                                 {% endif %}
                                             </div>
-                                        </td>
-                                        <td>
-                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
-                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
-                                            </time>
-                                        </td>
-                                        {% if permissions.can_manage_team(current_user, team) %}
-                                        <td>
-                                            <span class="text-muted">—</span>
-                                        </td>
-                                        {% endif %}
-                                    </tr>
-                                    {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small text-muted">
+                                            {% if membership.preferred_miles %}
+                                                <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
+                                            {% endif %}
+                                            {% if membership.planned_pace %}
+                                                <strong>Pace:</strong> {{ membership.planned_pace }}/mile<br>
+                                            {% endif %}
+                                            {% if membership.preferred_station %}
+                                                <strong>End Station:</strong> {{ membership.preferred_station }}<br>
+                                            {% endif %}
+                                            {% if membership.comments %}
+                                                <strong>Comments:</strong> {{ membership.comments }}
+                                            {% endif %}
+                                            {% if current_user.is_authenticated and membership.user_id == current_user.id %}
+                                                <a href="{{ url_for('user.my_registration') }}" class="text-primary text-decoration-none">
+                                                    <ion-icon name="create-outline" class="me-1"></ion-icon>Edit
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                            {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                        </time>
+                                    </td>
+                                    {% if permissions.can_manage_team(current_user, team) %}
+                                    <td>
+                                        <span class="text-muted">—</span>
+                                    </td>
                                     {% endif %}
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
 
-                                    <!-- Removed Team Members (Captain and Admin Only) -->
-                                    {% if removed_members and (permissions.can_manage_team(current_user, team)) %}
-                                    <tr>
-                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-danger px-3 py-2">
-                                            Removed ({{ removed_members|length }})
-                                        </td>
-                                    </tr>
-                                    {% for membership in removed_members %}
-                                    <tr class="table-danger-subtle">
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                {% if membership.user.avatar_url %}
-                                                    <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
-                                                         class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.4;">
+                                <!-- Removed Team Members (Captain and Admin Only) -->
+                                {% if removed_members and (permissions.can_manage_team(current_user, team)) %}
+                                <tr>
+                                    <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="fw-bold text-danger px-3 py-2">
+                                        Removed ({{ removed_members|length }})
+                                    </td>
+                                </tr>
+                                {% for membership in removed_members %}
+                                <tr class="table-danger-subtle">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if membership.user.avatar_url %}
+                                                <img src="{{ membership.user.avatar_url }}" alt="{{ membership.user.name }}"
+                                                     class="rounded-circle me-3 {% if current_user.is_authenticated and membership.user_id == current_user.id %}border border-2 border-primary{% endif %}" width="40" height="40" style="opacity: 0.4;">
+                                            {% endif %}
+                                            <div>
+                                                <strong class="text-muted">{{ membership.user.name }}</strong>
+                                                {% if current_user.is_authenticated and membership.user_id == current_user.id %}
+                                                    <!--span class="badge bg-primary ms-2">Me</span-->
                                                 {% endif %}
-                                                <div>
-                                                    <strong class="text-muted">{{ membership.user.name }}</strong>
-                                                    {% if current_user.is_authenticated and membership.user_id == current_user.id %}
-                                                        <!--span class="badge bg-primary ms-2">Me</span-->
-                                                    {% endif %}
-                                                    {% if permissions.can_manage_team(current_user, team) %}
-                                                        <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
-                                                            <small>{{ membership.user.email }}</small>
-                                                        </a>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="small text-muted">
-                                                {% if membership.preferred_miles %}
-                                                    <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
-                                                {% endif %}
-                                                {% if membership.planned_pace %}
-                                                    <strong>Pace:</strong> {{ membership.planned_pace }}/mile<br>
-                                                {% endif %}
-                                                {% if membership.preferred_station %}
-                                                    <strong>End Station:</strong> {{ membership.preferred_station }}<br>
-                                                {% endif %}
-                                                {% if membership.comments %}
-                                                    <strong>Comments:</strong> {{ membership.comments }}
+                                                {% if permissions.can_manage_team(current_user, team) %}
+                                                    <a href="mailto:{{ membership.user.email }}" class="link-secondary text-decoration-none d-block">
+                                                        <small>{{ membership.user.email }}</small>
+                                                    </a>
                                                 {% endif %}
                                             </div>
-                                        </td>
-                                        <td>
-                                            <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
-                                                {{ membership.joined_at.strftime('%b %-d, %Y') }}
-                                            </time>
-                                        </td>
-                                        {% if permissions.can_manage_team(current_user, team) %}
-                                        <td>
-                                            <span class="text-muted">—</span>
-                                        </td>
-                                        {% endif %}
-                                    </tr>
-                                    {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small text-muted">
+                                            {% if membership.preferred_miles %}
+                                                <strong>Miles:</strong> {{ membership.preferred_miles }}<br>
+                                            {% endif %}
+                                            {% if membership.planned_pace %}
+                                                <strong>Pace:</strong> {{ membership.planned_pace }}/mile<br>
+                                            {% endif %}
+                                            {% if membership.preferred_station %}
+                                                <strong>End Station:</strong> {{ membership.preferred_station }}<br>
+                                            {% endif %}
+                                            {% if membership.comments %}
+                                                <strong>Comments:</strong> {{ membership.comments }}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <time datetime="{{ membership.joined_at.isoformat() }}Z" title="{{ membership.joined_at.strftime('%B %-d, %Y at %I:%M %p') }}" class="small text-muted">
+                                            {{ membership.joined_at.strftime('%b %-d, %Y') }}
+                                        </time>
+                                    </td>
+                                    {% if permissions.can_manage_team(current_user, team) %}
+                                    <td>
+                                        <span class="text-muted">—</span>
+                                    </td>
                                     {% endif %}
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
 
-                                    {% if active_members|length == 0 and withdrawn_members|length == 0 %}
-                                    <tr>
-                                        <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="text-center text-muted p-4">
-                                            <ion-icon name="people-outline" style="font-size: 2rem;"></ion-icon>
-                                            <p class="mt-2 mb-0">No team members yet. Share the team invite to get started!</p>
-                                        </td>
-                                    </tr>
-                                    {% endif %}
-                                </tbody>
-                            </table>
-                        </div>
+                                {% if active_members|length == 0 and withdrawn_members|length == 0 %}
+                                <tr>
+                                    <td colspan="{% if permissions.can_manage_team(current_user, team) %}4{% else %}3{% endif %}" class="text-center text-muted p-4">
+                                        <ion-icon name="people-outline" style="font-size: 2rem;"></ion-icon>
+                                        <p class="mt-2 mb-0">No team members yet. Share the team invite to get started!</p>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
             </div>
+
             {% endif %}
         </div>
 
@@ -397,6 +395,22 @@
                         {% endif %}
                         <div class="row">
                             <div class="col-12">
+                                <div class="mb-4">
+                                    <h6>Captain Notifications</h6>
+                                    <p class="text-muted small">Control which email notifications you receive as team captain.</p>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="captain_notifications"
+                                               {% if current_user.captain_notifications_enabled %}checked{% endif %}>
+                                        <label class="form-check-label" for="captain_notifications">
+                                            Receive notifications when new members join or leave the team.
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-12">
                                 <div class="d-flex justify-content-between align-items-start gap-3">
                                     <div>
                                         <h6>Entry Management</h6>
@@ -435,9 +449,11 @@
         </div>
         {% endif %}
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script type="module">
-        import { membershipAPI, teamAPI, api, Utils } from '{{ url_for("static", filename="js/api-client.js") }}';
+        import { membershipAPI, teamAPI, api, Utils, userAPI } from '{{ url_for("static", filename="js/api-client.js") }}';
 
         // Membership management functions
         window.withdrawMembership = async function(membershipId) {
@@ -652,6 +668,26 @@
             }
         };
 
+        // Notification preferences handler
+        const captainNotificationsCheckbox = document.getElementById('captain_notifications');
+        if (captainNotificationsCheckbox) {
+            captainNotificationsCheckbox.addEventListener('change', async function(e) {
+                const enabled = e.target.checked;
+
+                const result = await userAPI.updateNotificationPreferences({
+                    captain_notifications_enabled: enabled
+                });
+
+                if (result.success) {
+                    api.showToast(result.data.message, 'success');
+                } else {
+                    // Revert checkbox on error
+                    e.target.checked = !enabled;
+                    api.showToast(result.error || 'Failed to update notification preferences', 'danger');
+                }
+            });
+        }
+
         // Form submission handlers
         const passwordForm = document.getElementById('password-form');
         if (passwordForm) {
@@ -711,6 +747,4 @@
             });
         }
     </script>
-    {% include '_footer.html' %}
-</body>
-</html>
+{% endblock %}

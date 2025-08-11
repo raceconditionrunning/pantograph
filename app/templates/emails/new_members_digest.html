@@ -1,0 +1,42 @@
+{% extends "emails/email_base.html" %}
+
+{% block title %}New Team Members{% endblock %}
+
+{% block header %}New Team Members{% endblock %}
+
+{% block content %}
+    <p>Hello {{ captain_name }},</p>
+
+    <p>{% if new_members|length == 1 %}A new member has joined{% else %}{{ new_members|length }} new members have joined{% endif %} your team!</p>
+
+    <div class="team-info">
+        <p><strong>Team:</strong> {{ team.name }}</p>
+        <p><strong>Total Members:</strong> {{ total_members }}</p>
+    </div>
+
+    <div class="member-list">
+        <h3>{% if new_members|length == 1 %}New Member:{% else %}New Members:{% endif %}</h3>
+        {% for member in new_members %}
+        <div class="member">
+            <div class="member-info">
+                <div class="member-name">{{ member.user.name }}</div>
+                <div class="member-details">
+                    {% if member.preferred_miles %}{{ member.preferred_miles }} miles{% endif %}
+                    {% if member.planned_pace_seconds %} • {{ (member.planned_pace_seconds // 60) }}:{{ '{:02d}'.format(member.planned_pace_seconds % 60) }}/mile pace{% endif %}
+                    {% if member.willing_to_lead %} • Willing to lead{% endif %}
+                    <br>
+                    <small>Joined {{ member.joined_at.strftime('%B %d at %I:%M %p') }}</small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <p>You can view your complete team roster and manage members by visiting your team page:</p>
+
+    <div class="btn-container">
+        <a href="{{ team_url }}" class="btn">View Team Roster</a>
+    </div>
+
+    <p><small>You'll receive these digest emails at most once per day when new members join your team. If you have any questions, please contact us at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></small></p>
+{% endblock %}
