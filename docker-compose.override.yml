@@ -10,9 +10,10 @@ services:
       - "./requirements.txt:/app/requirements.txt"
     ports:
       - "5001:5001"
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
-      - GITHUB_CLIENT_ID=Iv23li42q1gT2odOMIpb
-      - GITHUB_CLIENT_SECRET=0b3efcd8388466255669c89f4ff6fc67ad99825b
     command: ["uv", "run", "python", "wsgi.py"]

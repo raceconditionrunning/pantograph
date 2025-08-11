@@ -1,4 +1,5 @@
 uploads/**/*
 pantograph.db
 .env
+.env.dev
 .venv
