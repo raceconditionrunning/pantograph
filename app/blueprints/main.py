@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, current_app, send_from_directory
+from flask import Blueprint, render_template, current_app, send_from_directory, jsonify
 import os
 
 main = Blueprint('main', __name__)
@@ -25,6 +25,25 @@ def terms_of_service():
     """Renders the terms of service page."""
     return render_template('terms.html', 
                          contact_email=current_app.config.get('CONTACT_EMAIL'))
+
+
+@main.route('/stats')
+def global_stats():
+    """Returns global event statistics (unauthenticated endpoint)"""
+    from app.models import Team, TeamMembership, TeamMembershipStatus
+    
+    # Count total teams
+    team_count = Team.query.count()
+    
+    # Count total active team memberships
+    membership_count = TeamMembership.query.filter_by(
+        status=TeamMembershipStatus.ACTIVE
+    ).count()
+    
+    return jsonify({
+        'teams': team_count,
+        'memberships': membership_count
+    })
 
 
 @main.route('/.well-known/microsoft-identity-association.json')

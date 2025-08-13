@@ -33,7 +33,9 @@ def admin_dashboard():
             'member_count': len([m for m in team.memberships if m.status == TeamMembershipStatus.ACTIVE]),
             'status': team.status,
             'comments': team.comments,
-            'baton_serial': team.baton_serial
+            'baton_serial': team.baton_serial,
+            'previous_baton_serial': team.previous_baton_serial,
+            'has_password': team.has_password
         })
 
     # Get all users from database
@@ -48,6 +50,7 @@ def admin_dashboard():
             'id': user.id,
             'name': user.name,
             'email': user.email,
+            'provider': user.provider,
             'avatar_url': user.avatar_url,
             'is_admin': user.is_admin,
             'created_at': user.created_at,

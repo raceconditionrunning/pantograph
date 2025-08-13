@@ -29,7 +29,7 @@ class Config:
     # Application Name
     APPLICATION_NAME = "Pantograph"
     EVENT_NAME = "Light Rail Relay 2025"
-    EVENT_URL = "https://raceconditionrunning.com/light-rail-relay-2025"
+    EVENT_URL = "https://raceconditionrunning.com/light-rail-relay-25"
 
     # Core Flask configuration
     SECRET_KEY = get_secret('SECRET_KEY')

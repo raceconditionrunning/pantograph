@@ -60,6 +60,13 @@
                                             Closed
                                         </span>
                                         {% endif %}
+                                        {% if team.format == TeamFormat.TEAM %}
+                                            {% if team.has_password %}
+                                                <ion-icon name="lock-closed-outline" class="text-muted ms-1" style="font-size: 14px;" title="Password protected"></ion-icon>
+                                            {% else %}
+                                                <ion-icon name="lock-open-outline" class="text-muted ms-1" style="font-size: 14px;" title="No password"></ion-icon>
+                                            {% endif %}
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <a href="{{ url_for('teams.team_members', team_id=team.id) }}" target="_blank" class="text-decoration-none">
@@ -79,8 +86,14 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {{ team.baton_serial or 'N/A' }}
-                                        <button class="btn btn-link" onclick="openEditBatonSerialModal('{{ team.id }}', '{{ team.name }}', '{{ team.baton_serial or '' }}')">
+                                        {% if team.baton_serial %}
+                                            {{ team.baton_serial }}
+                                        {% elif team.previous_baton_serial %}
+                                            <span class="text-muted">{{ team.previous_baton_serial }}</span>
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
+                                        <button class="btn btn-link" onclick="openEditBatonSerialModal('{{ team.id }}', '{{ team.name }}', '{{ team.baton_serial or '' }}', '{{ team.previous_baton_serial or '' }}')">
                                             <ion-icon name="create-outline"></ion-icon>
                                         </button>
                                     </td>
@@ -164,7 +177,7 @@
                                                     <span class="badge bg-secondary ms-2 rounded-pill">Admin</span>
                                                 {% endif %}
                                                 <a href="mailto:{{ user.email }}" class="link-secondary text-decoration-none d-block">
-                                                    <small>{{ user.email }}</small>
+                                                    <small>{{ user.email }} <span class="text-secondary">· {{ user.provider.value }}</span></small>
                                                 </a>
                                             </div>
                                         </div>
@@ -239,12 +252,13 @@
                     <dl class="row">
                         <dt class="col-sm-6">Total Teams:</dt>
                         <dd class="col-sm-6">{{ teams|length }}</dd>
+                        <dt class="col-sm-6">Joinable Teams:</dt>
+                        <dd class="col-sm-6">{{ teams|selectattr('status', 'equalto', TeamStatus.OPEN)|list|length }}</dd>
                         <dt class="col-sm-6">Total Users:</dt>
                         <dd class="col-sm-6">{{ users|length }}</dd>
                         <dt class="col-sm-6">Total Photos:</dt>
                         <dd class="col-sm-6">{{ teams|sum(attribute='image_count') }}</dd>
-                        <dt class="col-sm-6">Active Teams:</dt>
-                        <dd class="col-sm-6">{{ teams|selectattr('image_count', '>', 0)|list|length }}</dd>
+
                     </dl>
                 </div>
             </div>
@@ -350,10 +364,11 @@ let currentUserId = null;
 let currentTeamId = null;
 
 // Baton serial modal
-window.openEditBatonSerialModal = function(teamId, teamName, currentSerial) {
+window.openEditBatonSerialModal = function(teamId, teamName, currentSerial, previousSerial) {
     currentTeamId = teamId;
     document.getElementById('editBatonSerialTeamName').textContent = teamName;
-    document.getElementById('baton_serial_input').value = currentSerial;
+    // Use previous serial as default if current serial is empty
+    document.getElementById('baton_serial_input').value = currentSerial || previousSerial || '';
     const modal = new bootstrap.Modal(document.getElementById('editBatonSerialModal'));
     modal.show();
 }

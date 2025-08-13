@@ -29,8 +29,8 @@
                             </label>
                             <select class="form-select" id="format" name="format" required{% if not current_user.is_authenticated %} disabled{% endif %}>
                                 <option value="">Select format...</option>
-                                <option value="Solo">Solo</option>
-                                <option value="Team">Team</option>
+                                <option value="Solo" {% if request.args.get('format') == 'solo' %}selected{% endif %}>Solo</option>
+                                <option value="Team" {% if request.args.get('format') == 'team' %}selected{% endif %}>Team</option>
                             </select>
                             <div class="form-text">Choose whether this is a solo or team effort</div>
                         </div>
@@ -61,6 +61,10 @@
                             </label>
                             <input type="password" class="form-control" id="password" name="password" maxlength="255"{% if not current_user.is_authenticated %} disabled{% endif %}>
                             <div class="form-text">Optional: Set a password to require for joining this team</div>
+                            <div class="alert alert-warning mt-2">
+                                <ion-icon name="warning-outline" class="me-2"></ion-icon>
+                                <strong>Privacy Note:</strong> If you don't set a password, anyone  can join and view team member names and any photos uploaded by your team.
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -112,7 +116,7 @@
                             <div class="d-flex align-items-center">
                                 <ion-icon name="mail" class="me-2"></ion-icon>
                                 <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %} {% if is_form_disabled or mode == 'preview' or mode == 'view' %}disabled{% endif %}>
+                                    <input class="form-check-input" type="checkbox" id="email_opt_in" name="email_opt_in" value="true" {% if (mode == 'edit' or mode == 'view') and user.email_opt_in %}checked{% endif %}{% if not current_user.is_authenticated %} disabled{% endif %}>
                                     <label class="form-check-label" for="email_opt_in">
                                        Email me when the next LRR happens.
                                     </label>

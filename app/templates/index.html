@@ -1,47 +1,147 @@
 {% extends "base.html" %}
 
 {% block content %}
+    <!-- Hero Section -->
+    <div class="row justify-content-center mb-4 mt-5">
+        <div class="col-lg-8 text-center">
+            <div class="d-flex align-items-center justify-content-center mb-3">
+                <img src="{{ url_for('static', filename='pantograph.svg') }}" alt="Pantograph Logo" width="64" height="64"
+                     class="me-3 invert-when-dark">
+                <h1 class="display-4 fw-semibold mb-0">Pantograph</h1>
+            </div>
+            <p class="lead text-muted mb-4">Team registration and photo management system for the <a href="{{ config.EVENT_URL }}" target="_blank">{{ config.EVENT_NAME }}</a></p>
+        </div>
+    </div>
+
+    <!-- What is Pantograph Section -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h2 class="h3 mb-4 text-center">
+                        What is Pantograph?
+                    </h2>
+                    <p class="text-muted">Pantograph is the registration and timing system for {{ config.EVENT_NAME }}. It lets participants:</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <ion-icon name="people-outline" class="text-primary me-2"></ion-icon>
+                                    <strong>Register teams</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <ion-icon name="person-add-outline" class="text-primary me-2"></ion-icon>
+                                    <strong>Join existing teams</strong> and share their preferences
+                                </li>
+
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                 <li class="mb-2">
+                                    <ion-icon name="images-outline" class="text-primary me-2"></ion-icon>
+                                    <strong>Upload exchange photos</strong> for timing
+                                </li>
+                                 <li class="mb-2">
+                                    <ion-icon name="document-outline" class="text-primary me-2"></ion-icon>
+                                    <strong>Sign the participation waiver</strong>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Why OAuth Section -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-lg-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h3 class="h4 mb-4 text-center">
+                        Why does Pantograph use sign in with Google/GitHub/Microsoft?
+                    </h3>
+                    <p class="text-muted">Pantograph uses secure OAuth authentication to:</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <ion-icon name="checkmark-circle-outline" class="text-success me-2"></ion-icon>
+                                    Verify participant identities for team registration
+                                </li>
+                                <li class="mb-2">
+                                    <ion-icon name="checkmark-circle-outline" class="text-success me-2"></ion-icon>
+                                    Ensure only team members can upload photos
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <ion-icon name="checkmark-circle-outline" class="text-success me-2"></ion-icon>
+                                    Protect team data and prevent unauthorized access
+                                </li>
+                                <li class="mb-2">
+                                    <ion-icon name="checkmark-circle-outline" class="text-success me-2"></ion-icon>
+                                    Use your existing account instead of creating a new password
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <ion-icon name="information-circle-outline" class="me-2"></ion-icon>
+                        <strong>Privacy:</strong> We only access your basic profile information (name, email, avatar) to create your account. We do not access or store any other data from your accounts. Read our full <a href="{{ url_for('main.privacy_policy') }}" class="alert-link">Privacy Policy</a> for more details.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Started Section -->
     <div class="row justify-content-center">
-        <div class="col-md-6 ">
-            <div class="card shadow-sm">
-                <div class="card-body text-center">
-                    <h2 class="card-title">Pantograph</h2>
-                    <p>Register for <a href="{{ config.EVENT_URL }}">{{ config.EVENT_NAME }}</a> by creating or joining a team. Upload exchange photos for timing.</p>
-                    <hr>
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-primary">
+                <div class="card-body text-center p-4">
+
                     {% if current_user.is_authenticated %}
                         {% set user_membership = current_user.memberships | selectattr('status', 'equalto', TeamMembershipStatus.ACTIVE) | first if current_user.memberships else none %}
                         {% set user_team = user_membership.team if user_membership else current_user.captained_teams | first if current_user.captained_teams else none %}
 
                         {% if user_team %}
-                            <p>Welcome back! Check on your team:</p>
-                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
-                            <a href="{{ url_for('teams.team_members', team_id=user_team.id) }}" class="btn btn-primary btn-lg mx-1">
-                                {% if user_team.format == TeamFormat.SOLO %}
-                                    <ion-icon name="person-outline" class="me-1"></ion-icon> Entry
-                                {% else %}
-                                    <ion-icon name="people-outline" class="me-1"></ion-icon> Members
-                                {% endif %}
-                            </a>
-
-                            <a href="{{ url_for('teams.gallery', team_id=user_team.id) }}" class="btn btn-primary btn-lg mx-1">
-                                <ion-icon name="images-outline" class="me-1"></ion-icon> Photos
-                            </a>
-                              </div>
+                        <h3>Welcome back!</h3>
+                            <p class="text-muted mb-4">Check on your team:</p>
+                            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                                <a href="{{ url_for('teams.team_members', team_id=user_team.id) }}" class="btn btn-primary btn-lg">
+                                    {% if user_team.format == TeamFormat.SOLO %}
+                                        <ion-icon name="person-outline" class="me-1"></ion-icon> View Entry
+                                    {% else %}
+                                        <ion-icon name="people-outline" class="me-1"></ion-icon> Members
+                                    {% endif %}
+                                </a>
+                                <a href="{{ url_for('teams.gallery', team_id=user_team.id) }}" class="btn btn-primary btn-lg">
+                                    <ion-icon name="images-outline" class="me-1"></ion-icon> View Photos
+                                </a>
+                            </div>
                         {% else %}
-                            <p>You're not on a team yet. Get started by creating or joining one.</p>
-                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
-                            <a href="{{ url_for('user.create_team') }}" class="btn btn-primary btn-lg mx-1">
-                                <ion-icon name="add-circle-outline" class="me-1"></ion-icon> Create Team
-                            </a>
-                            <a href="{{ url_for('user.join_team') }}" class="btn btn-primary btn-lg mx-1">
-                                <ion-icon name="person-add-outline" class="me-1"></ion-icon> Join Team
-                            </a>
-                    </div>
+                            <p class="text-muted mb-4">Get started by creating your own team or joining an existing one:</p>
+                            <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                                <a href="{{ url_for('user.create_team') }}" class="btn btn-primary btn-lg">
+                                    <ion-icon name="add-circle-outline" class="me-1"></ion-icon> Create Team
+                                </a>
+                                <a href="{{ url_for('user.join_team') }}" class="btn btn-outline-primary btn-lg">
+                                    <ion-icon name="person-add-outline" class="me-1"></ion-icon> Join Team
+                                </a>
+                            </div>
                         {% endif %}
                     {% else %}
-                        <p>Please sign in to create or join a team.</p>
+                      <h3 class="h4 mb-3">
+                        Ready to participate?
+                    </h3>
+
+                        <p class="text-muted mb-4">Sign in to register for {{ config.EVENT_NAME }}:</p>
                         <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">
-                            Sign in to Get Started
+                           Sign In
                         </a>
                     {% endif %}
                 </div>

@@ -3,16 +3,18 @@ import os
 import time
 import hashlib
 import secrets
+import csv
+import io
 
-from flask import Blueprint, request, redirect, render_template, send_from_directory, jsonify, abort, url_for
+from flask import Blueprint, request, redirect, render_template, send_from_directory, jsonify, abort, url_for, Response
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 from app.models import db, Team, TeamMembership, TeamStatus, TeamMembershipStatus
 from app.permissions import (
     team_access_required, team_captain_required,
-    team_captain_or_member_required, team_upload_allowed
+    team_captain_or_member_required, team_upload_allowed, admin_required
 )
-from app.utils import is_allowed_image, validate_image_content, secure_filename_enhanced, find_team_by_id, find_team_by_gallery_hash, load_station_names, parse_hh_mm_to_seconds, convert_heic_to_jpeg, is_heic_file
+from app.utils import is_allowed_image, validate_image_content, secure_filename_enhanced, find_team_by_id, find_team_by_gallery_hash, load_station_names, parse_hh_mm_to_seconds, convert_heic_to_jpeg, is_heic_file, format_mm_ss_from_seconds
 from app.config import Config
 from app.security import limiter
 
@@ -125,6 +127,73 @@ def team_members(team_id, team):
                          team_id=team_id,
                          willing_leaders_count=willing_leaders_count,
                          avg_preferred_miles=avg_preferred_miles)
+
+
+def _export_members_data(team, format_type='csv'):
+    """Helper function to export team member data in CSV or TSV format"""
+    # Get active team memberships
+    memberships = TeamMembership.query.filter_by(
+        team_id=team.id, 
+        status=TeamMembershipStatus.ACTIVE
+    ).all()
+    
+    # Create output
+    output = io.StringIO()
+    fieldnames = [
+        'name', 'email', 'preferred_miles', 'planned_pace', 
+        'preferred_station', 'willing_to_lead', 'comments', 'joined_date'
+    ]
+    
+    delimiter = '\t' if format_type == 'tsv' else ','
+    writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=delimiter)
+    writer.writeheader()
+    
+    # Write member data
+    for membership in memberships:
+        user = membership.user
+        pace_formatted = format_mm_ss_from_seconds(membership.planned_pace_seconds) if membership.planned_pace_seconds else ''
+        
+        writer.writerow({
+            'name': user.name,
+            'email': user.email,
+            'preferred_miles': str(membership.preferred_miles) if membership.preferred_miles else '',
+            'planned_pace': pace_formatted,
+            'preferred_station': membership.preferred_station or '',
+            'willing_to_lead': 'Yes' if membership.willing_to_lead else 'No',
+            'comments': membership.comments or '',
+            'joined_date': membership.joined_at.strftime('%Y-%m-%d %H:%M:%S') if membership.joined_at else ''
+        })
+    
+    output.seek(0)
+    return output.getvalue()
+
+
+@teams.route('/<team_id>/members/csv')
+@team_captain_required()
+def export_members_csv(team_id, team):
+    """Export team member preferences as CSV (captain or admin only)"""
+    content = _export_members_data(team, 'csv')
+    filename = f"{team.name.replace(' ', '_')}_members.csv"
+    
+    return Response(
+        content,
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@teams.route('/<team_id>/members/tsv')
+@team_captain_required()
+def export_members_tsv(team_id, team):
+    """Export team member preferences as TSV (captain or admin only)"""
+    content = _export_members_data(team, 'tsv')
+    filename = f"{team.name.replace(' ', '_')}_members.tsv"
+    
+    return Response(
+        content,
+        mimetype='text/tab-separated-values',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 
 @teams.route('/<team_id>/images/<image_id>', methods=['DELETE'])
